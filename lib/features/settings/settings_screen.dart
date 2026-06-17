@@ -6,7 +6,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/services/data_export_service.dart';
+
 import '../../features/auth/role_selection_screen.dart';
 import 'vehicles_screen.dart';
 import 'work_hours_screen.dart';
@@ -41,8 +41,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final s = ref.read(settingsProvider);
     _name = TextEditingController(text: s.instructorName);
     _title = TextEditingController(text: s.instructorTitle);
-    _businessName = TextEditingController(text: s.businessName ?? '');
-    _termsText = TextEditingController(text: s.termsAndConditions ?? '');
+    _businessName = TextEditingController(text: s.businessName);
+    _termsText = TextEditingController(text: s.termsAndConditions);
   }
 
   @override
@@ -228,6 +228,91 @@ class _BusinessTab extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Banking & Stripe
+        _SectionHeader(title: 'Banking & Stripe', icon: Icons.account_balance),
+        const SizedBox(height: 12),
+        _SettingsCard(
+          child: Column(
+            children: [
+              ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.sunsetBright.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.credit_card, color: AppColors.sunsetBright, size: 20),
+                ),
+                title: const Text('Connect Stripe Account'),
+                subtitle: const Text('Receive payouts directly to your bank'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Stripe Connect'),
+                      content: const Text(
+                        'Connect your Stripe account to receive secure payouts directly to your bank. '
+                        'Your card details are never stored by us — Stripe handles all payment processing securely.',
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Stripe Connect integration will be available soon'),
+                                backgroundColor: AppColors.sunsetBright,
+                              ),
+                            );
+                          },
+                          style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
+                          child: const Text('Connect'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.account_balance, color: AppColors.info, size: 20),
+                ),
+                title: const Text('Bank Account Details'),
+                subtitle: const Text('Manage your payout bank account'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Bank Account'),
+                      content: const Text(
+                        'Your bank account details are managed securely through Stripe. '
+                        'We never store your bank account information directly.',
+                      ),
+                      actions: [
+                        FilledButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),

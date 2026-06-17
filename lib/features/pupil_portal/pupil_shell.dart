@@ -13,6 +13,8 @@ import 'pupil_resources_screen.dart';
 import 'slot_request_screen.dart';
 import 'pupil_payment_screen.dart';
 
+import 'pupil_settings_screen.dart';
+
 class PupilShell extends ConsumerStatefulWidget {
   const PupilShell({super.key});
 
@@ -22,72 +24,115 @@ class PupilShell extends ConsumerStatefulWidget {
 
 class _PupilShellState extends ConsumerState<PupilShell> {
   int _currentIndex = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final List<_TabItem> _tabs = [
-    _TabItem(
-      icon: Icons.home,
-      label: 'Home',
-      screen: const PupilHomeScreen(),
-    ),
-    _TabItem(
-      icon: Icons.calendar_today,
-      label: 'Slots',
-      screen: const SlotRequestScreen(),
-    ),
-    _TabItem(
-      icon: Icons.trending_up,
-      label: 'Progress',
-      screen: const PupilProgressScreen(),
-    ),
-    _TabItem(
-      icon: Icons.message,
-      label: 'Messages',
-      screen: const PupilMessagingScreen(),
-    ),
-    _TabItem(
-      icon: Icons.payment,
-      label: 'Payments',
-      screen: const PupilPaymentScreen(),
-    ),
-    _TabItem(
-      icon: Icons.school,
-      label: 'Resources',
-      screen: const PupilResourcesScreen(),
-    ),
+  final List<_PupilTab> _tabs = [
+    _PupilTab(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', screen: const PupilHomeScreen()),
+    _PupilTab(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today, label: 'Slots', screen: const SlotRequestScreen()),
+    _PupilTab(icon: Icons.trending_up_outlined, activeIcon: Icons.trending_up, label: 'Progress', screen: const PupilProgressScreen()),
+    _PupilTab(icon: Icons.message_outlined, activeIcon: Icons.message, label: 'Messages', screen: const PupilMessagingScreen()),
+    _PupilTab(icon: Icons.payment_outlined, activeIcon: Icons.payment, label: 'Payments', screen: const PupilPaymentScreen()),
+    _PupilTab(icon: Icons.school_outlined, activeIcon: Icons.school, label: 'Resources', screen: const PupilResourcesScreen()),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF8F6F2),
       appBar: AppBar(
-        title: Text(_tabs[_currentIndex].label),
+        toolbarHeight: 56,
+        backgroundColor: isDark ? AppColors.darkBg : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        shadowColor: Colors.black.withValues(alpha: 0.04),
+        shape: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.06),
+            width: 1,
+          ),
+        ),
+        leadingWidth: 48,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.sunset, AppColors.sunsetBright],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Icon(
+                _tabs[_currentIndex].activeIcon,
+                size: 17,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _tabs[_currentIndex].label,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.darkText : AppColors.lightText,
+                letterSpacing: -0.2,
+              ),
+            ),
+            Text(
+              'Pupil Dashboard',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+                color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, size: 22),
-            tooltip: 'Sign out',
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Sign Out'),
-                  content: const Text('Are you sure you want to sign out?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-                      child: const Text('Sign Out'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true) {
-                await Supabase.instance.client.auth.signOut();
-                if (mounted) {
-                  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
-                }
-              }
-            },
+          Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.grey.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.settings_outlined, size: 19),
+              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+              tooltip: 'Settings',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilSettingsScreen())),
+            ),
+          ),
+          Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.grey.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.logout, size: 18),
+              color: AppColors.error.withValues(alpha: 0.7),
+              tooltip: 'Sign out',
+              onPressed: () => _signOut(),
+            ),
           ),
         ],
       ),
@@ -95,106 +140,204 @@ class _PupilShellState extends ConsumerState<PupilShell> {
         index: _currentIndex,
         children: _tabs.map((tab) => tab.screen).toList(),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+      bottomNavigationBar: SizedBox(
+        height: 68,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkCard.withValues(alpha: 0.92) : Colors.white.withValues(alpha: 0.92),
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark ? AppColors.darkBorder.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.06),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      Expanded(
+                        child: _ChinNavItem(
+                          selected: _currentIndex == i,
+                          icon: _tabs[i].icon,
+                          activeIcon: _tabs[i].activeIcon,
+                          onTap: () => setState(() => _currentIndex = i),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: -4,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.sunset, AppColors.sunsetBright],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.sunsetBright.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _showQuickActions(),
+                    customBorder: const CircleBorder(),
+                    child: const Icon(Icons.add, color: Colors.white, size: 24),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.blue,
-          unselectedItemColor: Colors.grey,
-          selectedLabelStyle: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: GoogleFonts.poppins(
-            fontSize: 12,
-          ),
-          items: _tabs.map((tab) {
-            return BottomNavigationBarItem(
-              icon: Icon(tab.icon),
-              label: tab.label,
-            );
-          }).toList(),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showQuickActions();
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await Supabase.instance.client.auth.signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    }
   }
 
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Quick Actions',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            _QuickActionTile(
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.sunsetBright.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.add_rounded, color: AppColors.sunsetBright, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick Actions',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Choose an action below',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _PupilQuickActionTile(
               icon: Icons.search,
               label: 'Find Tutors',
-              color: Colors.orange,
+              subtitle: 'Search for nearby driving instructors',
+              color: AppColors.sunsetBright,
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NearbyTutorsScreen(),
-                  ),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NearbyTutorsScreen()));
               },
             ),
-            const SizedBox(height: 12),
-            _QuickActionTile(
+            const SizedBox(height: 10),
+            _PupilQuickActionTile(
               icon: Icons.mail,
               label: 'Send Enquiry',
-              color: Colors.orange,
+              subtitle: 'Contact an instructor with questions',
+              color: AppColors.info,
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PupilEnquiryScreen(),
-                  ),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilEnquiryScreen()));
               },
             ),
-            const SizedBox(height: 12),
-            _QuickActionTile(
+            const SizedBox(height: 10),
+            _PupilQuickActionTile(
               icon: Icons.logout,
-              label: 'Logout',
-              color: Colors.red,
+              label: 'Sign Out',
+              subtitle: 'Log out of your account',
+              color: AppColors.error,
               onTap: () async {
                 Navigator.pop(context);
-                await Supabase.instance.client.auth.signOut();
-                if (mounted) {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Sign Out'),
+                    content: const Text('Are you sure?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+                        child: const Text('Sign Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  await Supabase.instance.client.auth.signOut();
+                  if (!mounted) return;
                   Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
                 }
               },
@@ -206,55 +349,136 @@ class _PupilShellState extends ConsumerState<PupilShell> {
   }
 }
 
-class _TabItem {
+class _PupilTab {
   final IconData icon;
+  final IconData activeIcon;
   final String label;
   final Widget screen;
 
-  _TabItem({
+  _PupilTab({
     required this.icon,
+    required this.activeIcon,
     required this.label,
     required this.screen,
   });
 }
 
-class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({
+class _ChinNavItem extends StatelessWidget {
+  const _ChinNavItem({
+    required this.selected,
+    required this.icon,
+    required this.activeIcon,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final IconData activeIcon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      height: 52,
+      child: InkWell(
+        onTap: onTap,
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? activeIcon : icon,
+              size: 21,
+              color: selected
+                  ? AppColors.sunsetBright
+                  : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+            ),
+            const SizedBox(height: 4),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: selected ? 18 : 0,
+              height: 2.5,
+              decoration: BoxDecoration(
+                color: AppColors.sunsetBright,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PupilQuickActionTile extends StatelessWidget {
+  const _PupilQuickActionTile({
     required this.icon,
     required this.label,
+    required this.subtitle,
     required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: color,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: color.withValues(alpha: 0.4), size: 20),
+            ],
+          ),
         ),
       ),
     );
