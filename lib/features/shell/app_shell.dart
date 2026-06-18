@@ -224,55 +224,58 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: SizedBox(
-        width: 64,
-        height: 64,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.sunsetBright, Color(0xFFF28C28)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.sunsetBright.withValues(alpha: 0.5),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _showQuickActions(context),
-                  customBorder: const CircleBorder(),
-                  child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.sunsetBright, Color(0xFFF28C28)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.sunsetBright.withValues(alpha: 0.5),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _showQuickActions(context),
+                    customBorder: const CircleBorder(),
+                    child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -315,13 +318,13 @@ class _NotchedNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final int centerIndex = tabs.length ~/ 2;
     return SizedBox(
-      height: 100,
+      height: 110,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
           Positioned(
-            bottom: 0,
+            bottom: 8,
             left: 0,
             right: 0,
             child: ClipPath(
@@ -367,30 +370,27 @@ class _NotchedNavBar extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: 0,
+            bottom: 8,
             left: 0,
             right: 0,
             child: SizedBox(
               height: 76,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(tabs.length, (index) {
-                    final isSelected = selectedIndex == index;
-                    final tab = tabs[index];
-                    final isCenter = index == centerIndex;
-                    return _NavBarItem(
-                      icon: isSelected ? tab.active : tab.icon,
-                      label: tab.label,
-                      isSelected: isSelected,
-                      isDark: isDark,
-                      isCenter: isCenter,
-                      onTap: () => onTap(index),
-                    );
-                  }),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(tabs.length, (index) {
+                  final isSelected = selectedIndex == index;
+                  final tab = tabs[index];
+                  final isCenter = index == centerIndex;
+                  return _NavBarItem(
+                    icon: isSelected ? tab.active : tab.icon,
+                    label: tab.label,
+                    isSelected: isSelected,
+                    isDark: isDark,
+                    isCenter: isCenter,
+                    onTap: () => onTap(index),
+                  );
+                }),
               ),
             ),
           ),
