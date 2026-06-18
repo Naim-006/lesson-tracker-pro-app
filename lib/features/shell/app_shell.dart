@@ -1,4 +1,5 @@
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,22 +7,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/route_transitions.dart';
 import '../activity/activity_screen.dart';
 import '../auth/onboarding_screen.dart';
 import '../diary/diary_screen.dart';
-import '../diary/open_slot_form_screen.dart';
-import '../finances/expense_form_screen.dart';
 import '../finances/finances_screen.dart';
-import '../finances/multi_step_payment_screen.dart';
 import '../home/home_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../pupils/pupils_screen.dart';
-import '../pupils/pupil_form_screen.dart';
-import '../finances/payment_form_screen.dart';
 import '../quick_add/quick_add_sheet.dart';
-import '../quick_add/mileage_dialog.dart';
-import '../settings/settings_screen.dart';
 import 'app_drawer.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -231,112 +224,63 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: GestureDetector(
-        onTap: () => _showQuickActions(context),
-        child: Container(
-          width: 60,
-          height: 60,
-          margin: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.sunsetBright, AppColors.sunset],
-            ),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.5),
-              width: 3,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.sunsetBright.withValues(alpha: 0.5),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-                spreadRadius: -2,
+      floatingActionButton: SizedBox(
+        width: 64,
+        height: 64,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+            ),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.sunsetBright, Color(0xFFF28C28)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.sunsetBright.withValues(alpha: 0.5),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: const Icon(Icons.add_rounded, size: 30, color: Colors.white),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showQuickActions(context),
+                  customBorder: const CircleBorder(),
+                  child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: ClipPath(
-        clipper: _NotchedBarClipper(),
-        child: Container(
-          height: 92,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : const Color(0xFFE8E4DE),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-                spreadRadius: -4,
-              ),
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.6),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-                spreadRadius: -2,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _GlassNavItem(
-                selected: tab == 0,
-                icon: _tabs[0].icon,
-                activeIcon: _tabs[0].active,
-                label: _tabs[0].label,
-                onTap: () => ref.read(currentTabProvider.notifier).state = 0,
-              ),
-              _GlassNavItem(
-                selected: tab == 1,
-                icon: _tabs[1].icon,
-                activeIcon: _tabs[1].active,
-                label: _tabs[1].label,
-                onTap: () => ref.read(currentTabProvider.notifier).state = 1,
-              ),
-              const SizedBox(width: 64),
-              _GlassNavItem(
-                selected: tab == 2,
-                icon: _tabs[2].icon,
-                activeIcon: _tabs[2].active,
-                label: _tabs[2].label,
-                onTap: () => ref.read(currentTabProvider.notifier).state = 2,
-              ),
-              _GlassNavItem(
-                selected: tab == 3,
-                icon: _tabs[3].icon,
-                activeIcon: _tabs[3].active,
-                label: _tabs[3].label,
-                onTap: () => ref.read(currentTabProvider.notifier).state = 3,
-              ),
-              _GlassNavItem(
-                selected: tab == 4,
-                icon: _tabs[4].icon,
-                activeIcon: _tabs[4].active,
-                label: _tabs[4].label,
-                onTap: () => ref.read(currentTabProvider.notifier).state = 4,
-              ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: _NotchedNavBar(
+        selectedIndex: tab,
+        tabs: _tabs,
+        isDark: isDark,
+        onTap: (index) => ref.read(currentTabProvider.notifier).state = index,
       ),
     );
   }
@@ -354,38 +298,129 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
-class _NotchedBarClipper extends CustomClipper<Path> {
+class _NotchedNavBar extends StatelessWidget {
+  const _NotchedNavBar({
+    required this.selectedIndex,
+    required this.tabs,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final int selectedIndex;
+  final List<({IconData icon, IconData active, String label})> tabs;
+  final bool isDark;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 90,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: ClipPath(
+              clipper: _NavBarClipper(),
+              child: Container(
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      isDark
+                          ? AppColors.darkCard.withValues(alpha: 0.95)
+                          : Colors.white.withValues(alpha: 0.98),
+                      isDark ? AppColors.darkCard : Colors.white,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                      blurRadius: 24,
+                      offset: const Offset(0, -4),
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : AppColors.lightBorder.withValues(alpha: 0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: List.generate(tabs.length, (index) {
+                        final isSelected = selectedIndex == index;
+                        final tab = tabs[index];
+                        return _NavBarItem(
+                          icon: isSelected ? tab.active : tab.icon,
+                          label: tab.label,
+                          isSelected: isSelected,
+                          isDark: isDark,
+                          onTap: () => onTap(index),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavBarClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final path = Path();
-    final w = size.width;
-    final h = size.height;
-    const notchRadius = 38.0;
-    final centerX = w / 2;
+    final double w = size.width;
+    final double h = size.height;
+    final double centerX = w / 2;
+    final double notchRadius = 36;
+    final double notchDepth = 28;
 
-    path.moveTo(28, 0);
-    path.lineTo(centerX - notchRadius - 12, 0);
+    path.moveTo(0, 0);
+    path.lineTo(centerX - notchRadius - 16, 0);
+
     path.quadraticBezierTo(
-      centerX - notchRadius - 4, 0,
-      centerX - notchRadius + 4, 14,
+      centerX - notchRadius - 8,
+      0,
+      centerX - notchRadius,
+      notchDepth * 0.4,
     );
+
     path.arcToPoint(
-      Offset(centerX + notchRadius - 4, 14),
-      radius: const Radius.circular(notchRadius),
+      Offset(centerX + notchRadius, notchDepth * 0.4),
+      radius: Radius.circular(notchRadius),
       clockwise: false,
     );
+
     path.quadraticBezierTo(
-      centerX + notchRadius + 4, 0,
-      centerX + notchRadius + 12, 0,
+      centerX + notchRadius + 8,
+      0,
+      centerX + notchRadius + 16,
+      0,
     );
-    path.lineTo(w - 28, 0);
-    path.quadraticBezierTo(w, 0, w, 28);
-    path.lineTo(w, h - 28);
-    path.quadraticBezierTo(w, h, w - 28, h);
-    path.lineTo(28, h);
-    path.quadraticBezierTo(0, h, 0, h - 28);
-    path.lineTo(0, 28);
-    path.quadraticBezierTo(0, 0, 28, 0);
+
+    path.lineTo(w, 0);
+    path.lineTo(w, h);
+    path.lineTo(0, h);
     path.close();
 
     return path;
@@ -395,84 +430,60 @@ class _NotchedBarClipper extends CustomClipper<Path> {
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
-class _GlassNavItem extends StatelessWidget {
-  const _GlassNavItem({
-    required this.selected,
+class _NavBarItem extends StatelessWidget {
+  const _NavBarItem({
     required this.icon,
-    required this.activeIcon,
     required this.label,
+    required this.isSelected,
+    required this.isDark,
     required this.onTap,
   });
 
-  final bool selected;
   final IconData icon;
-  final IconData activeIcon;
   final String label;
+  final bool isSelected;
+  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = AppColors.sunsetBright;
+    final inactiveColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: selected ? 14 : 10,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.sunsetBright.withValues(alpha: isDark ? 0.25 : 0.18),
-                    AppColors.sunset.withValues(alpha: isDark ? 0.2 : 0.12),
-                  ],
-                )
-              : null,
-          borderRadius: BorderRadius.circular(18),
-          border: selected
-              ? Border.all(
-                  color: AppColors.sunsetBright.withValues(alpha: 0.3),
-                  width: 1.0,
-                )
-              : null,
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.sunsetBright.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                    spreadRadius: -2,
-                  ),
-                ]
-              : null,
-        ),
+      child: SizedBox(
+        width: 64,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              selected ? activeIcon : icon,
-              size: selected ? 22 : 21,
-              color: selected
-                  ? AppColors.sunsetBright
-                  : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              width: isSelected ? 52 : 40,
+              height: isSelected ? 32 : 32,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? activeColor.withValues(alpha: isDark ? 0.2 : 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                size: isSelected ? 24 : 22,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected
-                    ? AppColors.sunsetBright
-                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
-                height: 1.0,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? activeColor : inactiveColor,
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -481,8 +492,6 @@ class _GlassNavItem extends StatelessWidget {
     );
   }
 }
-
-
 
 class _AppWordmark extends StatelessWidget {
   const _AppWordmark();
