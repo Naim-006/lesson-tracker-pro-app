@@ -32,7 +32,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
   GearboxType _gearbox = GearboxType.manual;
 
   bool _waitingList = false;
-  bool _inviteApp = false;
   bool _terms = false;
   bool _requireSignature = false;
   bool _showLocations = false;
@@ -58,7 +57,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
     if (e != null) {
       _gearbox = e.mechanicalGearboxPreference;
       _waitingList = e.onWaitingList || e.status == PupilStatus.waiting;
-      _inviteApp = e.inviteToApp;
       _terms = e.termsAccepted;
       _requireSignature = e.requireSignatureBeforeBooking;
       _availabilityDays.addAll(e.weeklyAvailabilityDays);
@@ -100,7 +98,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
           'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-          'invite_to_app': _inviteApp,
           'terms_accepted': _terms,
         }).eq('id', widget.existing!.id);
 
@@ -134,7 +131,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
           'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-          'invite_to_app': _inviteApp,
           'terms_accepted': _terms,
         });
 
@@ -541,13 +537,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
                     subtitle: const Text('Status will be "Waiting" instead of "Current"', style: TextStyle(fontSize: 12)),
                     value: _waitingList,
                     onChanged: (v) => setState(() => _waitingList = v),
-                    activeColor: AppColors.sunsetBright,
-                  ),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    title: const Text('Send invite link to companion app', style: TextStyle(fontWeight: FontWeight.w700)),
-                    value: _inviteApp,
-                    onChanged: (v) => setState(() => _inviteApp = v),
                     activeColor: AppColors.sunsetBright,
                   ),
                   SwitchListTile(

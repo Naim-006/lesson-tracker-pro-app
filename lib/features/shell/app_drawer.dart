@@ -10,7 +10,7 @@ import '../auth/onboarding_screen.dart';
 import '../activity/support_screen.dart';
 import '../enquiry/enquiry_screen.dart';
 import '../help/help_screen.dart';
-import '../pupils/pupil_invitation_link_screen.dart';
+import '../pupils/pupil_invitation_screen.dart';
 import '../settings/settings_screen.dart';
 import '../test_reports/test_reports_screen.dart';
 
@@ -76,7 +76,7 @@ class AppDrawer extends ConsumerWidget {
                     title: 'Pupil Invitations',
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilInvitationLinkScreen()));
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilInvitationScreen()));
                     },
                   ),
                   const SizedBox(height: 8),

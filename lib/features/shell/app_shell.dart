@@ -16,6 +16,7 @@ import '../notifications/notifications_screen.dart';
 import '../pupils/pupils_screen.dart';
 import '../quick_add/quick_add_sheet.dart';
 import 'app_drawer.dart';
+import '../auth/subscription_intro_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -104,7 +105,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
-  void _showSubscriptionDialog() {}
+  void _showSubscriptionDialog() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionIntroScreen(),
+      ),
+    );
+  }
 
   Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
