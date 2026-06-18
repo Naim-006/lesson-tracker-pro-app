@@ -224,62 +224,40 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: SizedBox(
-          width: 64,
-          height: 64,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.sunsetBright, Color(0xFFF28C28)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.sunsetBright.withValues(alpha: 0.5),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _showQuickActions(context),
-                    customBorder: const CircleBorder(),
-                    child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
+      floatingActionButton: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.sunsetBright, Color(0xFFF28C28)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sunsetBright.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showQuickActions(context),
+            customBorder: const CircleBorder(),
+            child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: _NotchedNavBar(
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      bottomNavigationBar: _FloatingNavBar(
         selectedIndex: tab,
         tabs: _tabs,
         isDark: isDark,
@@ -293,16 +271,14 @@ class _AppShellState extends ConsumerState<AppShell> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (_) => const QuickAddSheet(),
     );
   }
 }
 
-class _NotchedNavBar extends StatelessWidget {
-  const _NotchedNavBar({
+class _FloatingNavBar extends StatelessWidget {
+  const _FloatingNavBar({
     required this.selectedIndex,
     required this.tabs,
     required this.isDark,
@@ -316,133 +292,71 @@ class _NotchedNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int centerIndex = tabs.length ~/ 2;
-    return SizedBox(
-      height: 110,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          Positioned(
-            bottom: 8,
-            left: 0,
-            right: 0,
-            child: ClipPath(
-              clipper: _NavBarClipper(),
-              child: Container(
-                height: 76,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      isDark
-                          ? AppColors.darkCard.withValues(alpha: 0.95)
-                          : Colors.white.withValues(alpha: 0.98),
-                      isDark ? AppColors.darkCard : Colors.white,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                      blurRadius: 24,
-                      offset: const Offset(0, -4),
-                      spreadRadius: -2,
-                    ),
-                  ],
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : AppColors.lightBorder.withValues(alpha: 0.5),
-                          width: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            height: 68,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.white.withValues(alpha: 0.85),
+                  isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.white.withValues(alpha: 0.65),
+                ],
               ),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.7),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -4,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                  spreadRadius: -2,
+                ),
+              ],
             ),
-          ),
-          Positioned(
-            bottom: 8,
-            left: 0,
-            right: 0,
-            child: SizedBox(
-              height: 76,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.end,
                 children: List.generate(tabs.length, (index) {
                   final isSelected = selectedIndex == index;
                   final tab = tabs[index];
-                  final isCenter = index == centerIndex;
                   return _NavBarItem(
                     icon: isSelected ? tab.active : tab.icon,
                     label: tab.label,
                     isSelected: isSelected,
                     isDark: isDark,
-                    isCenter: isCenter,
                     onTap: () => onTap(index),
                   );
                 }),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-}
-
-class _NavBarClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    final double w = size.width;
-    final double h = size.height;
-    final double centerX = w / 2;
-    final double notchRadius = 36;
-    final double notchDepth = 44;
-
-    path.moveTo(0, 0);
-    path.lineTo(centerX - notchRadius - 20, 0);
-
-    path.quadraticBezierTo(
-      centerX - notchRadius - 10,
-      0,
-      centerX - notchRadius,
-      notchDepth * 0.3,
-    );
-
-    path.arcToPoint(
-      Offset(centerX + notchRadius, notchDepth * 0.3),
-      radius: Radius.circular(notchRadius),
-      clockwise: false,
-    );
-
-    path.quadraticBezierTo(
-      centerX + notchRadius + 10,
-      0,
-      centerX + notchRadius + 20,
-      0,
-    );
-
-    path.lineTo(w, 0);
-    path.lineTo(w, h);
-    path.lineTo(0, h);
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
 class _NavBarItem extends StatelessWidget {
@@ -451,7 +365,6 @@ class _NavBarItem extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.isDark,
-    required this.isCenter,
     required this.onTap,
   });
 
@@ -459,7 +372,6 @@ class _NavBarItem extends StatelessWidget {
   final String label;
   final bool isSelected;
   final bool isDark;
-  final bool isCenter;
   final VoidCallback onTap;
 
   @override
@@ -470,30 +382,42 @@ class _NavBarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 64,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 14 : 10,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    activeColor.withValues(alpha: isDark ? 0.25 : 0.18),
+                    activeColor.withValues(alpha: isDark ? 0.15 : 0.10),
+                  ],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected
+              ? Border.all(
+                  color: activeColor.withValues(alpha: 0.25),
+                  width: 1.0,
+                )
+              : null,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              width: isSelected ? 52 : 40,
-              height: isSelected ? 32 : 32,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? activeColor.withValues(alpha: isDark ? 0.2 : 0.15)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                icon,
-                size: isSelected ? 24 : 22,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
+            Icon(
+              icon,
+              size: isSelected ? 24 : 22,
+              color: isSelected ? activeColor : inactiveColor,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
