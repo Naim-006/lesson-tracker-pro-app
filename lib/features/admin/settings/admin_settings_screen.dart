@@ -18,7 +18,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -61,7 +61,10 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   title: 'Payment Methods',
                   subtitle: 'Configure accepted payment methods',
                   onTap: () {
-                    // Configure payment methods
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PaymentSettingsScreen()),
+                    );
                   },
                 ),
               ],
@@ -96,7 +99,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   title: 'Teaching Resources',
                   subtitle: 'Manage teaching resources for instructors',
                   onTap: () {
-                    // Manage resources
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Coming soon')),
+                    );
                   },
                 ),
               ],
@@ -111,21 +116,27 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                   title: 'App Configuration',
                   subtitle: 'Configure app-wide settings',
                   onTap: () {
-                    // Configure app
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Coming soon')),
+                    );
                   },
                 ),
                 _buildSettingTile(
                   title: 'Email Settings',
                   subtitle: 'Configure email notifications',
                   onTap: () {
-                    // Configure email
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Coming soon')),
+                    );
                   },
                 ),
                 _buildSettingTile(
                   title: 'Security Settings',
                   subtitle: 'Manage security configurations',
                   onTap: () {
-                    // Configure security
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Coming soon')),
+                    );
                   },
                 ),
               ],
@@ -143,7 +154,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

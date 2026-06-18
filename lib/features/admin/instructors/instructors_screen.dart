@@ -49,13 +49,19 @@ class _InstructorsScreenState extends ConsumerState<InstructorsScreen> {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading instructors: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -63,7 +69,7 @@ class _InstructorsScreenState extends ConsumerState<InstructorsScreen> {
                 // Header
                 Container(
                   padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
                   child: Row(
                     children: [
                       const Text(
@@ -93,19 +99,22 @@ class _InstructorsScreenState extends ConsumerState<InstructorsScreen> {
                       ? const Center(
                           child: Text('No instructors found'),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _instructors.length,
-                          itemBuilder: (context, index) {
-                            final instructor = _instructors[index];
-                            final subscription = instructor['instructor_subscriptions'] as List?;
-                            final hasActiveSubscription = subscription != null && subscription.isNotEmpty;
-                            
-                            return _buildInstructorCard(
-                              instructor,
-                              hasActiveSubscription,
-                            );
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadInstructors,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _instructors.length,
+                            itemBuilder: (context, index) {
+                              final instructor = _instructors[index];
+                              final subscription = instructor['instructor_subscriptions'] as List?;
+                              final hasActiveSubscription = subscription != null && subscription.isNotEmpty;
+                              
+                              return _buildInstructorCard(
+                                instructor,
+                                hasActiveSubscription,
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -114,11 +123,12 @@ class _InstructorsScreenState extends ConsumerState<InstructorsScreen> {
   }
 
   Widget _buildInstructorCard(Map<String, dynamic> instructor, bool hasActiveSubscription) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

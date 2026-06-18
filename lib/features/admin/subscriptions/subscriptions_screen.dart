@@ -46,13 +46,19 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading subscriptions: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -60,7 +66,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 // Header
                 Container(
                   padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
                   child: Row(
                     children: [
                       const Text(
@@ -88,14 +94,17 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                       ? const Center(
                           child: Text('No subscriptions found'),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _subscriptions.length,
-                          itemBuilder: (context, index) {
-                            final subscription = _subscriptions[index];
-                            final profile = subscription['profiles'] as Map?;
-                            return _buildSubscriptionCard(subscription, profile);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadSubscriptions,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _subscriptions.length,
+                            itemBuilder: (context, index) {
+                              final subscription = _subscriptions[index];
+                              final profile = subscription['profiles'] as Map?;
+                              return _buildSubscriptionCard(subscription, profile);
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -109,12 +118,13 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     final planType = subscription['plan_type'] as String? ?? 'basic';
     final startDate = subscription['start_date'] as String?;
     final endDate = subscription['end_date'] as String?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -405,10 +415,11 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     required String value,
     required IconData icon,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDark ? AppColors.darkCardElevated : AppColors.lightCard,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -436,7 +447,8 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
   }
 
   String _formatDate(String dateString) {
-    final date = DateTime.parse(dateString);
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return 'N/A';
     return '${date.day}/${date.month}/${date.year}';
   }
 }

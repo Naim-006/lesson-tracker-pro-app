@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import 'pupil_progress_screen.dart';
+import 'nearby_tutors_screen.dart';
+import 'pupil_messaging_screen.dart';
+import 'slot_request_screen.dart';
+import 'pupil_payment_screen.dart';
 
 class PupilHomeScreen extends StatefulWidget {
   const PupilHomeScreen({super.key});
@@ -15,6 +20,8 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _upcomingLessons = [];
   List<Map<String, dynamic>> _invoices = [];
+  List<Map<String, dynamic>> _progressCategories = [];
+  List<Map<String, dynamic>> _progressSkills = [];
   bool _isLoading = true;
 
   @override
@@ -52,10 +59,38 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
           .order('created_at', ascending: false)
           .limit(5);
 
+      // Load progress data
+      List<Map<String, dynamic>> categories = [];
+      List<Map<String, dynamic>> skills = [];
+      final linkResponse = await Supabase.instance.client
+          .from('instructor_pupil_links')
+          .select('instructor_id')
+          .eq('pupil_id', user!.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      if (linkResponse != null) {
+        final instructorId = linkResponse['instructor_id'];
+        final categoriesResponse = await Supabase.instance.client
+            .from('progress_categories')
+            .select('*')
+            .eq('instructor_id', instructorId)
+            .order('order_index', ascending: true);
+        categories = List<Map<String, dynamic>>.from(categoriesResponse);
+
+        final skillsResponse = await Supabase.instance.client
+            .from('progress_skills')
+            .select('*, progress_categories!inner(name)')
+            .eq('pupil_id', user!.id);
+        skills = List<Map<String, dynamic>>.from(skillsResponse);
+      }
+
       setState(() {
         _profile = profileResponse;
         _upcomingLessons = List<Map<String, dynamic>>.from(lessonsResponse);
         _invoices = List<Map<String, dynamic>>.from(invoicesResponse);
+        _progressCategories = categories;
+        _progressSkills = skills;
         _isLoading = false;
       });
     } catch (e) {
@@ -197,25 +232,25 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
                   icon: Icons.calendar_today,
                   label: 'Book Lesson',
                   color: Colors.blue,
-                  onTap: () {},
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SlotRequestScreen())),
                 ),
                 _QuickActionCard(
                   icon: Icons.trending_up,
                   label: 'Progress',
                   color: Colors.green,
-                  onTap: () {},
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilProgressScreen())),
                 ),
                 _QuickActionCard(
                   icon: Icons.search,
                   label: 'Find Tutors',
                   color: Colors.orange,
-                  onTap: () {},
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NearbyTutorsScreen())),
                 ),
                 _QuickActionCard(
                   icon: Icons.message,
                   label: 'Messages',
                   color: Colors.purple,
-                  onTap: () {},
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilMessagingScreen())),
                 ),
               ],
             ),
@@ -243,7 +278,7 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SlotRequestScreen())),
                   child: Text(
                     'View All',
                     style: GoogleFonts.poppins(color: Colors.blue),
@@ -276,7 +311,7 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SlotRequestScreen())),
                       child: const Text('Book a Lesson'),
                     ),
                   ],
@@ -378,7 +413,7 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
                                 ),
                               ),
                               ElevatedButton(
-                                onPressed: () {},
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilPaymentScreen())),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   padding: const EdgeInsets.symmetric(
@@ -415,43 +450,70 @@ class _PupilHomeScreenState extends State<PupilHomeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+            if (_progressCategories.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.trending_up,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No progress data yet',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Link with an instructor to start tracking progress',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: _progressCategories.take(4).map((category) {
+                    final categorySkills = _progressSkills
+                        .where((s) => s['category_id'] == category['id'])
+                        .toList();
+                    final progress = categorySkills.isEmpty
+                        ? 0.0
+                        : categorySkills.fold<double>(0, (sum, s) => sum + (s['skill_level'] as int)) /
+                            (categorySkills.length * 5);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ProgressItem(
+                        label: category['name'],
+                        progress: progress,
+                        color: Colors.blue,
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
-              child: Column(
-                children: [
-                  _ProgressItem(
-                    label: 'Controls',
-                    progress: 0.75,
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 12),
-                  _ProgressItem(
-                    label: 'Manoeuvres',
-                    progress: 0.60,
-                    color: Colors.green,
-                  ),
-                  const SizedBox(height: 12),
-                  _ProgressItem(
-                    label: 'Junctions',
-                    progress: 0.45,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(height: 12),
-                  _ProgressItem(
-                    label: 'Road Positioning',
-                    progress: 0.50,
-                    color: Colors.purple,
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilProgressScreen())),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 minimumSize: const Size(double.infinity, 48),

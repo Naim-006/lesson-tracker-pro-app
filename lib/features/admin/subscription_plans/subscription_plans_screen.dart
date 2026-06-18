@@ -36,13 +36,19 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading plans: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -50,7 +56,7 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
                 // Header
                 Container(
                   padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
                   child: Row(
                     children: [
                       const Text(
@@ -78,13 +84,16 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
                       ? const Center(
                           child: Text('No subscription plans found'),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _plans.length,
-                          itemBuilder: (context, index) {
-                            final plan = _plans[index];
-                            return _buildPlanCard(plan);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadPlans,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _plans.length,
+                            itemBuilder: (context, index) {
+                              final plan = _plans[index];
+                              return _buildPlanCard(plan);
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -99,12 +108,13 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
     final features = plan['features'] as List?;
     final isActive = plan['is_active'] as bool? ?? false;
     final isFreeTier = plan['is_free_tier'] as bool? ?? false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

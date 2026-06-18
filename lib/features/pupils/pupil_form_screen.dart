@@ -95,9 +95,13 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
         await Supabase.instance.client.from('pupils').update({
           'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
           'address': _pickupAddress.text.trim().isEmpty ? null : _pickupAddress.text.trim(),
+          'dropoff_address': _dropoffAddress.text.trim().isEmpty ? null : _dropoffAddress.text.trim(),
           'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
+          'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
+          'invite_to_app': _inviteApp,
+          'terms_accepted': _terms,
         }).eq('id', widget.existing!.id);
 
         await Supabase.instance.client.from('profiles').update({
@@ -125,9 +129,13 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
           'id': profileId,
           'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
           'address': _pickupAddress.text.trim().isEmpty ? null : _pickupAddress.text.trim(),
+          'dropoff_address': _dropoffAddress.text.trim().isEmpty ? null : _dropoffAddress.text.trim(),
           'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
+          'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
+          'invite_to_app': _inviteApp,
+          'terms_accepted': _terms,
         });
 
         await Supabase.instance.client.from('instructor_pupil_links').insert({
@@ -186,6 +194,9 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.darkCard : Colors.white;
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -221,7 +232,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -298,6 +309,14 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
                       contentPadding: const EdgeInsets.all(16),
                     ),
                     keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final trimmed = v.trim();
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
+                        return 'Enter a valid email';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -317,7 +336,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             // Locations Card
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -371,7 +390,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -448,7 +467,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -504,7 +523,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             // Options Card
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -563,7 +582,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(

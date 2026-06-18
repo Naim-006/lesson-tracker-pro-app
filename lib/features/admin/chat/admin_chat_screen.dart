@@ -77,7 +77,11 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
         });
       }
 
-      conversations.sort((a, b) => DateTime.parse(b['created_at']).compareTo(DateTime.parse(a['created_at'])));
+      conversations.sort((a, b) {
+        final da = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0);
+        final db = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0);
+        return da.compareTo(db);
+      });
 
       setState(() {
         _conversations = conversations;
@@ -87,13 +91,19 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading conversations: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -101,7 +111,7 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
                 // Header
                 Container(
                   padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
                   child: const Text(
                     'Support Chat',
                     style: TextStyle(
@@ -116,14 +126,17 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
                       ? const Center(
                           child: Text('No conversations found'),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _conversations.length,
-                          itemBuilder: (context, index) {
-                            final conversation = _conversations[index];
-                            final profile = conversation['profiles'] as Map?;
-                            return _buildConversationCard(conversation, profile);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadConversations,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _conversations.length,
+                            itemBuilder: (context, index) {
+                              final conversation = _conversations[index];
+                              final profile = conversation['profiles'] as Map?;
+                              return _buildConversationCard(conversation, profile);
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -134,12 +147,13 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
   Widget _buildConversationCard(Map<String, dynamic> conversation, Map? profile) {
     final createdAt = conversation['created_at'] as String?;
     final profileId = profile?['id'] as String?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -232,7 +246,8 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
   }
 
   String _formatDate(String dateString) {
-    final date = DateTime.parse(dateString);
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return 'N/A';
     final now = DateTime.now();
     final difference = now.difference(date);
 

@@ -52,13 +52,19 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading enquiries: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -66,7 +72,7 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
                 // Header
                 Container(
                   padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
                   child: const Text(
                     'Enquiries',
                     style: TextStyle(
@@ -81,13 +87,16 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
                       ? const Center(
                           child: Text('No enquiries found'),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _enquiries.length,
-                          itemBuilder: (context, index) {
-                            final enquiry = _enquiries[index];
-                            return _buildEnquiryCard(enquiry);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _loadEnquiries,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _enquiries.length,
+                            itemBuilder: (context, index) {
+                              final enquiry = _enquiries[index];
+                              return _buildEnquiryCard(enquiry);
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -110,12 +119,13 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
     final instructorName = enquiry['instructor_name'] as String?;
     final instructorEmail = enquiry['instructor_email'] as String?;
     final instructorPhone = enquiry['instructor_phone'] as String?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -476,7 +486,8 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
   }
 
   String _formatDate(String dateString) {
-    final date = DateTime.parse(dateString);
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return 'N/A';
     final now = DateTime.now();
     final difference = now.difference(date);
 

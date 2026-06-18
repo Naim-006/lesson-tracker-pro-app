@@ -108,14 +108,14 @@ class _AdminChatReplyScreenState extends State<AdminChatReplyScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
-                    ? Center(
+                      ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
+                            Icon(Icons.chat_bubble_outline, size: 64, color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkMuted : Colors.grey.shade300),
                             const SizedBox(height: 16),
                             Text('No messages yet. Reply to start the conversation.',
-                                style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                                style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkMuted : Colors.grey.shade500, fontSize: 16)),
                           ],
                         ),
                       )
@@ -133,7 +133,7 @@ class _AdminChatReplyScreenState extends State<AdminChatReplyScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : AppColors.lightCard,
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
             ),
             child: Row(
@@ -179,7 +179,7 @@ class _AdminChatReplyScreenState extends State<AdminChatReplyScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          color: isAdmin ? AppColors.navy : Colors.grey.shade200,
+          color: isAdmin ? AppColors.navy : (Theme.of(context).brightness == Brightness.dark ? AppColors.darkCardElevated : Colors.grey.shade200),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),

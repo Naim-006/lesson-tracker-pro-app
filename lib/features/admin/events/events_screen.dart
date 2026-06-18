@@ -14,6 +14,8 @@ class EventsScreen extends ConsumerStatefulWidget {
 class _EventsScreenState extends ConsumerState<EventsScreen> {
   List<Map<String, dynamic>> _events = [];
   bool _isLoading = true;
+  String? _errorMessage;
+  int? _processingEventId;
 
   @override
   void initState() {
@@ -22,6 +24,10 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
   }
 
   Future<void> _loadEvents() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final response = await Supabase.instance.client
           .from('events')
@@ -35,60 +41,97 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _errorMessage = 'Failed to load events. Please try again.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? AppColors.darkBg : const Color(0xFFF5F5F5);
+    final headerBg = isDark ? AppColors.darkCard : Colors.white;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: scaffoldBg,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  color: Colors.white,
-                  child: Row(
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Events',
+                      Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
                         style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isDark ? AppColors.darkMuted : Colors.grey.shade600,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () => _showCreateEventDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Create Event'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.sunset,
+                        onPressed: _loadEvents,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.sunset),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadEvents,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        color: headerBg,
+                        child: Row(
+                          children: [
+                            Text(
+                              'Events',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? AppColors.darkText : AppColors.lightText,
+                              ),
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: () => _showCreateEventDialog(),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Create Event'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.sunset,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      Expanded(
+                        child: _events.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No events found',
+                                  style: TextStyle(
+                                    color: isDark ? AppColors.darkMuted : Colors.grey.shade600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _events.length,
+                                itemBuilder: (context, index) {
+                                  final event = _events[index];
+                                  return _buildEventCard(event);
+                                },
+                              ),
                       ),
                     ],
                   ),
                 ),
-                // Events list
-                Expanded(
-                  child: _events.isEmpty
-                      ? const Center(
-                          child: Text('No events found'),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _events.length,
-                          itemBuilder: (context, index) {
-                            final event = _events[index];
-                            return _buildEventCard(event);
-                          },
-                        ),
-                ),
-              ],
-            ),
     );
   }
 
@@ -97,16 +140,22 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
     final description = event['description'] as String?;
     final eventDate = event['event_date'] as String?;
     final isPublished = event['is_published'] as bool? ?? false;
+    final eventId = event['id'] as int?;
+    final isProcessing = _processingEventId == eventId;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.darkCard : Colors.white;
+    final mutedColor = isDark ? AppColors.darkMuted : Colors.grey.shade600;
+    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -123,16 +172,17 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                   children: [
                     Text(
                       title ?? 'Untitled Event',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       description ?? 'No description',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: mutedColor,
                         fontSize: 14,
                       ),
                       maxLines: 2,
@@ -164,12 +214,12 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+              Icon(Icons.calendar_today, size: 16, color: mutedColor),
               const SizedBox(width: 8),
               Text(
                 eventDate != null ? _formatDate(eventDate) : 'No date set',
                 style: TextStyle(
-                  color: Colors.grey.shade600,
+                  color: mutedColor,
                   fontSize: 14,
                 ),
               ),
@@ -180,19 +230,25 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Edit event
-                  },
-                  icon: const Icon(Icons.edit),
+                  onPressed: isProcessing
+                      ? null
+                      : () => _showEditEventDialog(event),
+                  icon: isProcessing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.edit),
                   label: const Text('Edit'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Toggle publish status
-                  },
+                  onPressed: isProcessing || eventId == null
+                      ? null
+                      : () => _togglePublish(eventId, isPublished),
                   icon: Icon(isPublished ? Icons.visibility_off : Icons.visibility),
                   label: Text(isPublished ? 'Unpublish' : 'Publish'),
                 ),
@@ -200,9 +256,9 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Delete event
-                  },
+                  onPressed: isProcessing || eventId == null
+                      ? null
+                      : () => _deleteEvent(eventId, title),
                   icon: const Icon(Icons.delete),
                   label: const Text('Delete'),
                   style: OutlinedButton.styleFrom(
@@ -218,8 +274,12 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
   }
 
   String _formatDate(String dateString) {
-    final date = DateTime.parse(dateString);
-    return '${date.day}/${date.month}/${date.year}';
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (_) {
+      return dateString;
+    }
   }
 
   void _showCreateEventDialog() {
@@ -290,5 +350,136 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
         ],
       ),
     );
+  }
+
+  void _showEditEventDialog(Map<String, dynamic> event) {
+    final titleController = TextEditingController(text: event['title'] as String? ?? '');
+    final descriptionController = TextEditingController(text: event['description'] as String? ?? '');
+    final eventDateController = TextEditingController(text: event['event_date'] as String? ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Event'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: eventDateController,
+                decoration: const InputDecoration(
+                  labelText: 'Event Date (YYYY-MM-DD)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              try {
+                await Supabase.instance.client
+                    .from('events')
+                    .update({
+                      'title': titleController.text.trim(),
+                      'description': descriptionController.text.trim(),
+                      'event_date': eventDateController.text,
+                    })
+                    .eq('id', event['id']);
+                if (mounted) {
+                  Navigator.pop(context);
+                  _loadEvents();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating event: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _togglePublish(int eventId, bool currentStatus) async {
+    setState(() => _processingEventId = eventId);
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .update({'is_published': !currentStatus})
+          .eq('id', eventId);
+      await _loadEvents();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating event: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingEventId = null);
+      }
+    }
+  }
+
+  Future<void> _deleteEvent(int eventId, String? title) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: Text('Are you sure you want to delete "${title ?? 'Untitled Event'}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _processingEventId = eventId);
+    try {
+      await Supabase.instance.client.from('events').delete().eq('id', eventId);
+      await _loadEvents();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting event: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingEventId = null);
+      }
+    }
   }
 }

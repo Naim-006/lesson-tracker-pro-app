@@ -54,6 +54,11 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
       setState(() {
         _isLoading = false;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading monitoring data: $e')),
+        );
+      }
     }
   }
 
@@ -109,12 +114,13 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
     final details = log['details'] as String?;
     final timestamp = log['created_at'] as String?;
     final ipAddress = log['ip_address'] as String?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -186,12 +192,13 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
     final longitude = location['longitude'] as num?;
     final timestamp = location['timestamp'] as String?;
     final accuracy = location['accuracy'] as num?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -242,6 +249,7 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
   }
 
   Widget _buildStatisticsTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -299,7 +307,7 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -348,7 +356,8 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
   }
 
   String _formatTimestamp(String timestamp) {
-    final date = DateTime.parse(timestamp);
+    final date = DateTime.tryParse(timestamp);
+    if (date == null) return 'N/A';
     final now = DateTime.now();
     final difference = now.difference(date);
 
@@ -379,10 +388,11 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

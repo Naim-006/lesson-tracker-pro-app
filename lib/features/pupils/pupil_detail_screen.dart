@@ -81,7 +81,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
       email: pupilData['pupils']?['profiles']?['email'] ?? widget.pupil.email,
       postcode: pupilData['pupils']?['postcode'],
       pickupAddresses: pupilData['pupils']?['address'] != null ? [pupilData['pupils']!['address']] : widget.pupil.pickupAddresses,
-      hourlyRate: 40.0, // Default rate
+      hourlyRate: (pupilData['pupils']?['hourly_rate'] as num?)?.toDouble() ?? widget.pupil.hourlyRate,
       notes: pupilData['pupils']?['notes'],
     ) : widget.pupil;
 
@@ -89,10 +89,16 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
     final lessons = instructorLessons.value?.where((l) => l['pupil_id'] == pupil.id).map((lesson) {
       final pupilData = lesson['pupils'];
       final profile = pupilData?['profiles'];
+      DateTime parsedDate;
+      try {
+        parsedDate = DateTime.parse(lesson['date']);
+      } catch (_) {
+        parsedDate = DateTime.now();
+      }
       return Lesson(
         pupilId: lesson['pupil_id'],
         pupilName: profile?['full_name'] ?? 'Unknown',
-        date: DateTime.parse(lesson['date']),
+        date: parsedDate,
         time: lesson['time'],
         duration: lesson['duration'] ?? 60,
         rate: lesson['rate'] ?? 40.0,
@@ -116,7 +122,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
             floating: false,
             pinned: true,
             elevation: 0,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(
@@ -269,8 +275,8 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
           SliverToBoxAdapter(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
               ),
               child: TabBar(
                 controller: _tabController,
@@ -303,7 +309,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -361,7 +367,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
                       ...upcomingLessons.take(3).map((l) => Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
@@ -402,7 +408,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
                       ...pastLessons.take(5).map((l) => Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: ListTile(
@@ -458,7 +464,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
                       ...pupil.pickupAddresses.map((a) => Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
@@ -512,7 +518,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
@@ -602,7 +608,7 @@ class _StatBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -664,7 +670,7 @@ class _ContactTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

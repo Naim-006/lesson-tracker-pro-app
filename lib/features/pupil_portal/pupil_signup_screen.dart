@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/error_handler.dart';
+
 class PupilSignupScreen extends StatefulWidget {
   const PupilSignupScreen({super.key});
 
@@ -14,7 +17,7 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _invitationCodeController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -38,37 +41,23 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
       final password = _passwordController.text;
       final invitationCode = _invitationCodeController.text.trim().toUpperCase();
 
-      // Check if email is whitelisted or has valid invitation code
       final invitationResponse = await Supabase.instance.client
           .from('pupil_invitations')
           .select('*')
           .or('email.eq.$email,and(invitation_code.eq.$invitationCode,status.eq.pending)')
           .single();
 
-      if (invitationResponse == null) {
-        throw Exception('Invalid invitation code or email not whitelisted');
-      }
-
-      // Check if user already exists
-      final existingUser = await Supabase.instance.client.auth
-          .signInWithPassword(email: email, password: password);
-      
-      if (existingUser.user != null) {
-        await Supabase.instance.client.auth.signOut();
-        throw Exception('An account with this email already exists');
-      }
-
-      // Sign up the user
+      // Sign up the user (Supabase handles duplicate emails)
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
       if (response.user == null) {
-        throw Exception('Failed to create account');
+        throw Exception('signup_failed');
       }
 
-      // Create pupil profile
+      // Create profile record
       await Supabase.instance.client.from('profiles').insert({
         'id': response.user!.id,
         'email': email,
@@ -77,16 +66,11 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
         'email_verified': true,
       });
 
-      // Create pupil record
-      await Supabase.instance.client.from('pupils').insert({
-        'id': response.user!.id,
+      // Create instructor-pupil link
+      await Supabase.instance.client.from('instructor_pupil_links').insert({
         'instructor_id': invitationResponse['instructor_id'],
-        'email': email,
-        'first_name': invitationResponse['first_name'],
-        'last_name': invitationResponse['last_name'],
-        'phone': invitationResponse['phone'],
-        'status': 'current',
-        'created_at': DateTime.now().toIso8601String(),
+        'pupil_id': response.user!.id,
+        'status': 'active',
       });
 
       // Update invitation status
@@ -97,9 +81,9 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Account created successfully!'),
+            backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
@@ -109,8 +93,8 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            content: Text(userFriendlyError(e)),
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -124,144 +108,147 @@ class _PupilSignupScreenState extends State<PupilSignupScreen> {
         title: const Text('Pupil Sign Up'),
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Create Your Account',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Enter your invitation code and details to get started',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 32),
-              TextFormField(
-                controller: _invitationCodeController,
-                decoration: const InputDecoration(
-                  labelText: 'Invitation Code *',
-                  hintText: 'Enter your invitation code',
-                  prefixIcon: Icon(Icons.code),
-                  border: OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.characters,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your invitation code';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email *',
-                  hintText: 'Enter your email',
-                  prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password *',
-                  hintText: 'Create a password',
-                  prefixIcon: const Icon(Icons.lock),
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
+      body: AbsorbPointer(
+        absorbing: _isLoading,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Create Your Account',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                obscureText: _obscurePassword,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a password';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _confirmPasswordController,
-                decoration: InputDecoration(
-                  labelText: 'Confirm Password *',
-                  hintText: 'Confirm your password',
-                  prefixIcon: const Icon(Icons.lock),
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () {
-                      setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-                    },
+                const SizedBox(height: 8),
+                Text(
+                  'Enter your invitation code and details to get started',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
                   ),
                 ),
-                obscureText: _obscureConfirmPassword,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please confirm your password';
-                  }
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _signup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                const SizedBox(height: 32),
+                TextFormField(
+                  controller: _invitationCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Invitation Code *',
+                    hintText: 'Enter your invitation code',
+                    prefixIcon: Icon(Icons.code),
+                    border: OutlineInputBorder(),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Sign Up',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
+                  textCapitalization: TextCapitalization.characters,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your invitation code';
+                    }
+                    return null;
                   },
-                  child: const Text('Already have an account? Log In'),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email *',
+                    hintText: 'Enter your email',
+                    prefixIcon: Icon(Icons.email),
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Password *',
+                    hintText: 'Create a password',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                  ),
+                  obscureText: _obscurePassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Password *',
+                    hintText: 'Confirm your password',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () {
+                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                      },
+                    ),
+                  ),
+                  obscureText: _obscureConfirmPassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _signup,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.sunsetBright,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Sign Up',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: _isLoading ? null : () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Already have an account? Log In'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

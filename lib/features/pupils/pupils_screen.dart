@@ -67,51 +67,13 @@ class _PupilsScreenState extends ConsumerState<PupilsScreen>
   }
 
   void _showContactsPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Access Contacts'),
-        content: const Text('Lesson Tracker Pro needs access to your contacts to import pupil information. This will allow you to quickly add pupils from your phone contacts.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showImportDialog(context);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Allow Access'),
-          ),
-        ],
-      ),
-    );
+    _showImportContactsComingSoon(context);
   }
 
-  void _showImportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import Contacts'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Scanning contacts...'),
-          ],
-        ),
-      ),
+  void _showImportContactsComingSoon(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Contact import coming soon')),
     );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('3 contacts imported successfully')),
-      );
-    });
   }
 
   @override
@@ -121,7 +83,8 @@ class _PupilsScreenState extends ConsumerState<PupilsScreen>
 
     final pupils = instructorPupils.value?.map((link) {
       final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
+      if (pupilData == null) return null;
+      final profile = pupilData['profiles'];
       return Pupil(
         id: pupilData['id'],
         firstName: profile?['full_name']?.split(' ').first ?? '',
@@ -133,7 +96,7 @@ class _PupilsScreenState extends ConsumerState<PupilsScreen>
         status: _mapStatus(link['status']),
         outstandingBalance: 0.0,
       );
-    }).toList() ?? [];
+    }).whereType<Pupil>().toList() ?? [];
 
     final currentPupils = _filter(pupils.where((p) => p.status == PupilStatus.current).toList());
     final waitingPupils = _filter(pupils.where((p) => p.status == PupilStatus.waiting).toList());
@@ -269,43 +232,6 @@ class _FooterActionLink extends StatelessWidget {
                 color: AppColors.sunsetBright,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.lightBorder),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.sunsetBright),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.sunsetBright,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
               ),
             ),
           ],
@@ -567,6 +493,26 @@ class _PupilMenuButton extends ConsumerWidget {
             ),
           );
         } else if (v == 'delete') {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete Pupil'),
+              content: Text('Are you sure you want to delete ${pupil.fullName}? This action cannot be undone.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+
           final user = Supabase.instance.client.auth.currentUser;
           if (user == null) return;
 
