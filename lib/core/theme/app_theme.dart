@@ -25,6 +25,12 @@ class AppTheme {
       floatingActionButtonTheme: _fabTheme(colorScheme),
       inputDecorationTheme: _inputTheme(colorScheme),
       chipTheme: _chipTheme(colorScheme),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(foregroundColor: Colors.white),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(foregroundColor: Colors.white),
+      ),
       dividerTheme: DividerThemeData(color: AppColors.lightBorder, thickness: 1, space: 0),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
@@ -56,6 +62,12 @@ class AppTheme {
       floatingActionButtonTheme: _fabTheme(colorScheme),
       inputDecorationTheme: _inputTheme(colorScheme),
       chipTheme: _chipTheme(colorScheme),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(foregroundColor: Colors.white),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(foregroundColor: Colors.white),
+      ),
       dividerTheme: DividerThemeData(color: AppColors.darkBorder, thickness: 1, space: 0),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
