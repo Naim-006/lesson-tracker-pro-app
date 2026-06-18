@@ -54,23 +54,24 @@ class QuickAddSheet extends ConsumerWidget {
             ),
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 36, height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(7),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(colors: [AppColors.sunsetBright, AppColors.sunset]),
                             borderRadius: BorderRadius.circular(10),
@@ -78,11 +79,20 @@ class QuickAddSheet extends ConsumerWidget {
                               BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
                           ),
-                          child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                          child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                         ),
-                        const SizedBox(width: 10),
-                        Text('Quick Actions', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: 15)),
-                        const Spacer(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Quick Actions', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: 16)),
+                              const SizedBox(height: 1),
+                              Text('Add a record', style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade400, fontSize: 11)),
+                            ],
+                          ),
+                        ),
                         Container(
                           decoration: BoxDecoration(
                             color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade100,
@@ -97,21 +107,46 @@ class QuickAddSheet extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    _buildRow(isDark, [
-                      _CompactAction(icon: Icons.person_add_alt_1, label: 'Pupil', color: const Color(0xFF6C63FF), onTap: () => go(const PupilFormScreen())),
-                      _CompactAction(icon: Icons.speed, label: 'Mileage', color: const Color(0xFF00BFA5), onTap: () { Navigator.pop(context); showDialog(context: context, builder: (_) => const MileageDialog()); }),
-                      _CompactAction(icon: Icons.school, label: 'Lesson', color: AppColors.sunsetBright, onTap: () => go(const LessonFormScreen())),
-                      _CompactAction(icon: Icons.event, label: 'Event', color: const Color(0xFFFF6B6B), onTap: () => go(const EventFormScreen())),
-                    ]),
-                    const SizedBox(height: 8),
-                    _buildRow(isDark, [
-                      _CompactAction(icon: Icons.schedule, label: 'Slot', color: const Color(0xFFFFA726), onTap: () => go(const OpenSlotFormScreen())),
-                      _CompactAction(icon: Icons.payments, label: 'Payment', color: const Color(0xFF4CAF50), onTap: () => go(const PaymentFormScreen())),
-                      _CompactAction(icon: Icons.receipt_long, label: 'Expense', color: const Color(0xFFEF5350), onTap: () => go(const ExpenseFormScreen())),
-                    ]),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: _MedAction(icon: Icons.person_add_alt_1, label: 'Pupil', color: const Color(0xFF6C63FF), isDark: isDark, onTap: () => go(const PupilFormScreen()))),
+                            const SizedBox(width: 10),
+                            Expanded(child: _MedAction(icon: Icons.speed, label: 'Mileage', color: const Color(0xFF00BFA5), isDark: isDark, onTap: () { Navigator.pop(context); showDialog(context: context, builder: (_) => const MileageDialog()); })),
+                            const SizedBox(width: 10),
+                            Expanded(child: _MedAction(icon: Icons.school, label: 'Lesson', color: AppColors.sunsetBright, isDark: isDark, onTap: () => go(const LessonFormScreen()))),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: _MedAction(icon: Icons.event, label: 'Event', color: const Color(0xFFFF6B6B), isDark: isDark, onTap: () => go(const EventFormScreen()))),
+                            const SizedBox(width: 10),
+                            Expanded(child: _MedAction(icon: Icons.schedule, label: 'Open Slot', color: const Color(0xFFFFA726), isDark: isDark, onTap: () => go(const OpenSlotFormScreen()))),
+                            const SizedBox(width: 10),
+                            Expanded(child: _MedAction(icon: Icons.payments, label: 'Payment', color: const Color(0xFF4CAF50), isDark: isDark, onTap: () => go(const PaymentFormScreen()))),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: _MedAction(icon: Icons.receipt_long, label: 'Expense', color: const Color(0xFFEF5350), isDark: isDark, onTap: () => go(const ExpenseFormScreen()))),
+                            const SizedBox(width: 10),
+                            const Expanded(child: SizedBox()),
+                            const SizedBox(width: 10),
+                            const Expanded(child: SizedBox()),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
           ),
@@ -119,55 +154,46 @@ class QuickAddSheet extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildRow(bool isDark, List<_CompactAction> items) {
-    return Row(
-      children: [
-        for (int i = 0; i < items.length; i++) ...[
-          Expanded(child: items[i]),
-          if (i < items.length - 1) const SizedBox(width: 8),
-        ],
-        if (items.length < 4) ...[
-          const SizedBox(width: 8),
-          Expanded(child: SizedBox(height: items.length < 4 ? 0 : null)),
-        ],
-      ],
-    );
-  }
 }
 
-class _CompactAction extends StatelessWidget {
-  const _CompactAction({required this.icon, required this.label, required this.color, required this.onTap});
+class _MedAction extends StatelessWidget {
+  const _MedAction({required this.icon, required this.label, required this.color, required this.isDark, required this.onTap});
 
   final IconData icon;
   final String label;
   final Color color;
+  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
           decoration: BoxDecoration(
             color: color.withValues(alpha: isDark ? 0.1 : 0.07),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color.withValues(alpha: isDark ? 0.12 : 0.1), width: 0.5),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
             children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(height: 8),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white.withValues(alpha: 0.85) : Colors.black87,
                 ),
