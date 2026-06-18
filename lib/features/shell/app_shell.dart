@@ -313,8 +313,9 @@ class _NotchedNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final int centerIndex = tabs.length ~/ 2;
     return SizedBox(
-      height: 90,
+      height: 100,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
@@ -326,7 +327,7 @@ class _NotchedNavBar extends StatelessWidget {
             child: ClipPath(
               clipper: _NavBarClipper(),
               child: Container(
-                height: 72,
+                height: 76,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -360,22 +361,33 @@ class _NotchedNavBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: List.generate(tabs.length, (index) {
-                        final isSelected = selectedIndex == index;
-                        final tab = tabs[index];
-                        return _NavBarItem(
-                          icon: isSelected ? tab.active : tab.icon,
-                          label: tab.label,
-                          isSelected: isSelected,
-                          isDark: isDark,
-                          onTap: () => onTap(index),
-                        );
-                      }),
-                    ),
                   ),
                 ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: 76,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(tabs.length, (index) {
+                  final isSelected = selectedIndex == index;
+                  final tab = tabs[index];
+                  final isCenter = index == centerIndex;
+                  return _NavBarItem(
+                    icon: isSelected ? tab.active : tab.icon,
+                    label: tab.label,
+                    isSelected: isSelected,
+                    isDark: isDark,
+                    isCenter: isCenter,
+                    onTap: () => onTap(index),
+                  );
+                }),
               ),
             ),
           ),
@@ -393,28 +405,28 @@ class _NavBarClipper extends CustomClipper<Path> {
     final double h = size.height;
     final double centerX = w / 2;
     final double notchRadius = 36;
-    final double notchDepth = 28;
+    final double notchDepth = 44;
 
     path.moveTo(0, 0);
-    path.lineTo(centerX - notchRadius - 16, 0);
+    path.lineTo(centerX - notchRadius - 20, 0);
 
     path.quadraticBezierTo(
-      centerX - notchRadius - 8,
+      centerX - notchRadius - 10,
       0,
       centerX - notchRadius,
-      notchDepth * 0.4,
+      notchDepth * 0.3,
     );
 
     path.arcToPoint(
-      Offset(centerX + notchRadius, notchDepth * 0.4),
+      Offset(centerX + notchRadius, notchDepth * 0.3),
       radius: Radius.circular(notchRadius),
       clockwise: false,
     );
 
     path.quadraticBezierTo(
-      centerX + notchRadius + 8,
+      centerX + notchRadius + 10,
       0,
-      centerX + notchRadius + 16,
+      centerX + notchRadius + 20,
       0,
     );
 
@@ -436,6 +448,7 @@ class _NavBarItem extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.isDark,
+    required this.isCenter,
     required this.onTap,
   });
 
@@ -443,6 +456,7 @@ class _NavBarItem extends StatelessWidget {
   final String label;
   final bool isSelected;
   final bool isDark;
+  final bool isCenter;
   final VoidCallback onTap;
 
   @override
