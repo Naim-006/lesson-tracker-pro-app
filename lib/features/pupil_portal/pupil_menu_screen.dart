@@ -6,8 +6,6 @@ import '../auth/onboarding_screen.dart';
 import 'pupil_settings_screen.dart';
 import 'pupil_payment_screen.dart';
 import 'pupil_resources_screen.dart';
-import 'nearby_tutors_screen.dart';
-import 'pupil_enquiry_screen.dart';
 
 class PupilMenuScreen extends StatefulWidget {
   const PupilMenuScreen({super.key});
@@ -68,14 +66,6 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
             _MenuItem(icon: Icons.person_outline_rounded, label: 'Edit Profile', onTap: () {}),
             _MenuItem(icon: Icons.payment_rounded, label: 'Payments', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilPaymentScreen()))),
             _MenuItem(icon: Icons.receipt_long_rounded, label: 'Resources', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilResourcesScreen()))),
-          ], isDark),
-
-          const SizedBox(height: 16),
-
-          // Discover section
-          _buildSection('Discover', [
-            _MenuItem(icon: Icons.search_rounded, label: 'Find Tutors', color: const Color(0xFF8B5CF6), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NearbyTutorsScreen()))),
-            _MenuItem(icon: Icons.mail_rounded, label: 'Send Enquiry', color: const Color(0xFF3B82F6), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilEnquiryScreen()))),
           ], isDark),
 
           const SizedBox(height: 16),

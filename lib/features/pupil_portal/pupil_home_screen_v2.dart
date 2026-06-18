@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import 'slot_request_screen.dart';
 import 'pupil_progress_screen.dart';
-import 'nearby_tutors_screen.dart';
 import 'pupil_messaging_screen.dart';
 
 
@@ -510,14 +509,6 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
                 color: const Color(0xFF10B981),
                 isDark: isDark,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilProgressScreen())),
-              ),
-              const SizedBox(width: 8),
-              _ActionChip(
-                icon: Icons.search_rounded,
-                label: 'Tutors',
-                color: const Color(0xFF8B5CF6),
-                isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NearbyTutorsScreen())),
               ),
               const SizedBox(width: 8),
               _ActionChip(
