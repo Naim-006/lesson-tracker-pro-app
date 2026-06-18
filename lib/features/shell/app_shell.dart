@@ -232,7 +232,42 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: const SizedBox.shrink(),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: GestureDetector(
+          onTap: () => _showQuickActions(context),
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.sunsetBright, AppColors.sunset],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.4),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.sunsetBright.withValues(alpha: 0.45),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                  spreadRadius: -2,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+          ),
+        ),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -290,9 +325,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                       label: _tabs[1].label,
                       onTap: () => ref.read(currentTabProvider.notifier).state = 1,
                     ),
-                    _GlassCenterFab(
-                      onTap: () => _showQuickActions(context),
-                    ),
+                    const SizedBox(width: 56),
                     _GlassNavItem(
                       selected: tab == 2,
                       icon: _tabs[2].icon,
@@ -333,45 +366,6 @@ class _AppShellState extends ConsumerState<AppShell> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => const QuickAddSheet(),
-    );
-  }
-}
-
-class _GlassCenterFab extends StatelessWidget {
-  const _GlassCenterFab({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.sunsetBright, AppColors.sunset],
-          ),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.4),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.sunsetBright.withValues(alpha: 0.5),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
-              spreadRadius: -2,
-            ),
-          ],
-        ),
-        child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
-      ),
     );
   }
 }
