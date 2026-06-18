@@ -232,119 +232,81 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: ClipPath(
-        clipper: _HalfCircleClipper(),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.sunsetBright.withValues(alpha: 0.9),
-                  AppColors.sunset.withValues(alpha: 0.85),
-                ],
-              ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.sunsetBright.withValues(alpha: 0.5),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                  spreadRadius: -4,
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _showQuickActions(context),
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    size: 26,
-                    color: Colors.white,
-                    weight: 2.0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: const _HalfCircleFabLocation(),
+      floatingActionButton: const SizedBox.shrink(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
             child: Container(
-              height: 72,
+              height: 76,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
                     isDark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.75),
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.white.withValues(alpha: 0.72),
                     isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.white.withValues(alpha: 0.45),
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.42),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : Colors.white.withValues(alpha: 0.6),
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.55),
                   width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.12),
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.10),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                     spreadRadius: -4,
                   ),
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                    spreadRadius: -2,
-                  ),
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    for (var i = 0; i < _tabs.length; i++)
-                      _GlassNavItem(
-                        selected: tab == i,
-                        icon: _tabs[i].icon,
-                        activeIcon: _tabs[i].active,
-                        label: _tabs[i].label,
-                        onTap: () => ref.read(currentTabProvider.notifier).state = i,
-                      ),
+                    _GlassNavItem(
+                      selected: tab == 0,
+                      icon: _tabs[0].icon,
+                      activeIcon: _tabs[0].active,
+                      label: _tabs[0].label,
+                      onTap: () => ref.read(currentTabProvider.notifier).state = 0,
+                    ),
+                    _GlassNavItem(
+                      selected: tab == 1,
+                      icon: _tabs[1].icon,
+                      activeIcon: _tabs[1].active,
+                      label: _tabs[1].label,
+                      onTap: () => ref.read(currentTabProvider.notifier).state = 1,
+                    ),
+                    _GlassCenterFab(
+                      onTap: () => _showQuickActions(context),
+                    ),
+                    _GlassNavItem(
+                      selected: tab == 2,
+                      icon: _tabs[2].icon,
+                      activeIcon: _tabs[2].active,
+                      label: _tabs[2].label,
+                      onTap: () => ref.read(currentTabProvider.notifier).state = 2,
+                    ),
+                    _GlassNavItem(
+                      selected: tab == 3,
+                      icon: _tabs[3].icon,
+                      activeIcon: _tabs[3].active,
+                      label: _tabs[3].label,
+                      onTap: () => ref.read(currentTabProvider.notifier).state = 3,
+                    ),
                   ],
                 ),
               ),
@@ -368,37 +330,43 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
-class _HalfCircleClipper extends CustomClipper<Path> {
+class _GlassCenterFab extends StatelessWidget {
+  const _GlassCenterFab({required this.onTap});
+
+  final VoidCallback onTap;
+
   @override
-  Path getClip(Size size) {
-    final path = Path()
-      ..addArc(
-        Rect.fromCircle(center: Offset(size.width / 2, 0), radius: size.width / 2),
-        0,
-        3.14,
-      );
-    return path;
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.sunsetBright, AppColors.sunset],
+          ),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.4),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sunsetBright.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+              spreadRadius: -2,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+      ),
+    );
   }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
-
-class _HalfCircleFabLocation extends FloatingActionButtonLocation {
-  const _HalfCircleFabLocation();
-
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    final double fabX = (scaffoldGeometry.scaffoldSize.width - 52) / 2;
-    final double fabY = scaffoldGeometry.scaffoldSize.height
-        - scaffoldGeometry.bottomSheetSize.height
-        - 96
-        - 16;
-    return Offset(fabX, fabY);
-  }
-
-  @override
-  String toString() => 'HalfCircleFabLocation';
 }
 
 class _GlassNavItem extends StatelessWidget {
@@ -423,10 +391,10 @@ class _GlassNavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(
-          horizontal: selected ? 16 : 12,
+          horizontal: selected ? 14 : 10,
           vertical: 8,
         ),
         decoration: BoxDecoration(
@@ -435,12 +403,12 @@ class _GlassNavItem extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppColors.sunsetBright.withValues(alpha: isDark ? 0.25 : 0.2),
-                    AppColors.sunset.withValues(alpha: isDark ? 0.2 : 0.15),
+                    AppColors.sunsetBright.withValues(alpha: isDark ? 0.25 : 0.18),
+                    AppColors.sunset.withValues(alpha: isDark ? 0.2 : 0.12),
                   ],
                 )
               : null,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           border: selected
               ? Border.all(
                   color: AppColors.sunsetBright.withValues(alpha: 0.3),
@@ -450,9 +418,9 @@ class _GlassNavItem extends StatelessWidget {
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: AppColors.sunsetBright.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: AppColors.sunsetBright.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                     spreadRadius: -2,
                   ),
                 ]
@@ -462,24 +430,16 @@ class _GlassNavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, animation) => ScaleTransition(
-                scale: animation,
-                child: child,
-              ),
-              child: Icon(
-                selected ? activeIcon : icon,
-                key: ValueKey(selected),
-                size: selected ? 24 : 22,
-                color: selected
-                    ? AppColors.sunsetBright
-                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
-              ),
+            Icon(
+              selected ? activeIcon : icon,
+              size: selected ? 22 : 21,
+              color: selected
+                  ? AppColors.sunsetBright
+                  : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
             ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+            const SizedBox(height: 3),
+            Text(
+              label,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -487,9 +447,7 @@ class _GlassNavItem extends StatelessWidget {
                     ? AppColors.sunsetBright
                     : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                 height: 1.0,
-                letterSpacing: selected ? 0.3 : 0.2,
               ),
-              child: Text(label),
             ),
           ],
         ),
