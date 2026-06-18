@@ -307,6 +307,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                       label: _tabs[3].label,
                       onTap: () => ref.read(currentTabProvider.notifier).state = 3,
                     ),
+                    _GlassNavItem(
+                      selected: tab == 4,
+                      icon: _tabs[4].icon,
+                      activeIcon: _tabs[4].active,
+                      label: _tabs[4].label,
+                      onTap: () => ref.read(currentTabProvider.notifier).state = 4,
+                    ),
                   ],
                 ),
               ),
