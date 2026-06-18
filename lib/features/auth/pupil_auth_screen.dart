@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
-import '../pupil_portal/pupil_shell.dart';
+import '../pupil_portal/pupil_shell_v2.dart';
 
 class PupilAuthScreen extends StatefulWidget {
   const PupilAuthScreen({super.key});

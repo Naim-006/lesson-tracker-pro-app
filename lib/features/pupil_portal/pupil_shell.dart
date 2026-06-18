@@ -15,14 +15,14 @@ import 'pupil_payment_screen.dart';
 
 import 'pupil_settings_screen.dart';
 
-class PupilShell extends ConsumerStatefulWidget {
-  const PupilShell({super.key});
+class PupilShellOld extends ConsumerStatefulWidget {
+  const PupilShellOld({super.key});
 
   @override
-  ConsumerState<PupilShell> createState() => _PupilShellState();
+  ConsumerState<PupilShellOld> createState() => _PupilShellOldState();
 }
 
-class _PupilShellState extends ConsumerState<PupilShell> {
+class _PupilShellOldState extends ConsumerState<PupilShellOld> {
   int _currentIndex = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 

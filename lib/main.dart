@@ -9,7 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'core/utils/logger.dart';
 import 'features/shell/app_shell.dart';
 import 'features/auth/onboarding_screen.dart';
-import 'features/pupil_portal/pupil_shell.dart';
+import 'features/pupil_portal/pupil_shell_v2.dart';
 import 'features/admin/admin_shell.dart';
 
 void main() async {
