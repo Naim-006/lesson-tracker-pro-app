@@ -1,4 +1,5 @@
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -233,72 +234,120 @@ class _AppShellState extends ConsumerState<AppShell> {
       ),
       floatingActionButton: ClipPath(
         clipper: _HalfCircleClipper(),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.sunsetBright, AppColors.sunset],
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.sunsetBright.withValues(alpha: 0.9),
+                  AppColors.sunset.withValues(alpha: 0.85),
+                ],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.sunsetBright.withValues(alpha: 0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -4,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.sunsetBright.withValues(alpha: 0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _showQuickActions(context),
-              customBorder: const CircleBorder(),
-              child: const SizedBox(
-                width: 48,
-                height: 48,
-                child: Icon(Icons.add, size: 24, color: Colors.white),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _showQuickActions(context),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    size: 26,
+                    color: Colors.white,
+                    weight: 2.0,
+                  ),
+                ),
               ),
             ),
           ),
         ),
       ),
       floatingActionButtonLocation: const _HalfCircleFabLocation(),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: BottomAppBar(
-          color: Colors.transparent,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          height: 68,
-          padding: EdgeInsets.zero,
-          child: LayoutBuilder(
-            builder: (context, constraints) => Row(
-              children: [
-                for (var i = 0; i < _tabs.length; i++)
-                  _NavItem(
-                    selected: tab == i,
-                    icon: _tabs[i].icon,
-                    activeIcon: _tabs[i].active,
-                    label: _tabs[i].label,
-                    onTap: () => ref.read(currentTabProvider.notifier).state = i,
-                    itemWidth: constraints.maxWidth / _tabs.length,
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              height: 72,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.75),
+                    isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white.withValues(alpha: 0.45),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.6),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -4,
                   ),
-              ],
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      _GlassNavItem(
+                        selected: tab == i,
+                        icon: _tabs[i].icon,
+                        activeIcon: _tabs[i].active,
+                        label: _tabs[i].label,
+                        onTap: () => ref.read(currentTabProvider.notifier).state = i,
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -340,11 +389,11 @@ class _HalfCircleFabLocation extends FloatingActionButtonLocation {
 
   @override
   Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    final double fabX = (scaffoldGeometry.scaffoldSize.width - 48) / 2;
+    final double fabX = (scaffoldGeometry.scaffoldSize.width - 52) / 2;
     final double fabY = scaffoldGeometry.scaffoldSize.height
         - scaffoldGeometry.bottomSheetSize.height
-        - 68
-        - 24;
+        - 96
+        - 16;
     return Offset(fabX, fabY);
   }
 
@@ -352,14 +401,13 @@ class _HalfCircleFabLocation extends FloatingActionButtonLocation {
   String toString() => 'HalfCircleFabLocation';
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
+class _GlassNavItem extends StatelessWidget {
+  const _GlassNavItem({
     required this.selected,
     required this.icon,
     required this.activeIcon,
     required this.label,
     required this.onTap,
-    required this.itemWidth,
   });
 
   final bool selected;
@@ -367,64 +415,81 @@ class _NavItem extends StatelessWidget {
   final IconData activeIcon;
   final String label;
   final VoidCallback onTap;
-  final double itemWidth;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      width: itemWidth,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        splashFactory: InkRipple.splashFactory,
-        splashColor: AppColors.sunsetBright.withValues(alpha: 0.1),
-        highlightColor: AppColors.sunsetBright.withValues(alpha: 0.05),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: selected ? 16 : 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          gradient: selected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.sunsetBright.withValues(alpha: isDark ? 0.25 : 0.2),
+                    AppColors.sunset.withValues(alpha: isDark ? 0.2 : 0.15),
+                  ],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(20),
+          border: selected
+              ? Border.all(
+                  color: AppColors.sunsetBright.withValues(alpha: 0.3),
+                  width: 1.0,
+                )
+              : null,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.sunsetBright.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                    spreadRadius: -2,
+                  ),
+                ]
+              : null,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
+            AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: selected
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.sunsetBright.withValues(alpha: 0.2), AppColors.sunset.withValues(alpha: 0.15)],
-                      )
-                    : null,
-                color: selected ? null : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.sunsetBright.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
+              transitionBuilder: (child, animation) => ScaleTransition(
+                scale: animation,
+                child: child,
               ),
               child: Icon(
                 selected ? activeIcon : icon,
+                key: ValueKey(selected),
                 size: selected ? 24 : 22,
-                color: selected ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                color: selected
+                    ? AppColors.sunsetBright
+                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                color: selected ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? AppColors.sunsetBright
+                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                 height: 1.0,
-                letterSpacing: 0.2,
+                letterSpacing: selected ? 0.3 : 0.2,
               ),
+              child: Text(label),
             ),
           ],
         ),
