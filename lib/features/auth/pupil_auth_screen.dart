@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -25,10 +26,34 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _saveLogin = false;
   String? _errorMessage;
   String? _successMessage;
+  final _secureStorage = const FlutterSecureStorage();
+  bool _hasSavedCredentials = false;
   bool _emailNotConfirmed = false;
   DateTime? _lastResendTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedCredentials();
+  }
+
+  Future<void> _checkSavedCredentials() async {
+    try {
+      final email = await _secureStorage.read(key: 'pupil_email');
+      final password = await _secureStorage.read(key: 'pupil_password');
+      if (email != null && password != null && email.isNotEmpty && password.isNotEmpty) {
+        setState(() {
+          _emailController.text = email;
+          _passwordController.text = password;
+          _hasSavedCredentials = true;
+          _saveLogin = true;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -123,6 +148,14 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
         }
       }
     } catch (_) {}
+
+    if (_saveLogin) {
+      await _secureStorage.write(key: 'pupil_email', value: email);
+      await _secureStorage.write(key: 'pupil_password', value: _passwordController.text);
+    } else {
+      await _secureStorage.delete(key: 'pupil_email');
+      await _secureStorage.delete(key: 'pupil_password');
+    }
 
     if (mounted) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PupilShell()));
@@ -363,6 +396,28 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
             ),
             const SizedBox(height: 16),
           ],
+          if (_isLogin) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                SizedBox(
+                  height: 24, width: 24,
+                  child: Checkbox(
+                    value: _saveLogin,
+                    onChanged: (v) => setState(() => _saveLogin = v ?? false),
+                    activeColor: AppColors.sunsetBright,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _saveLogin = !_saveLogin),
+                  child: Text('Save login on this device', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600])),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
           _buildErrorMessage(),
           _buildSuccessMessage(),
           SizedBox(

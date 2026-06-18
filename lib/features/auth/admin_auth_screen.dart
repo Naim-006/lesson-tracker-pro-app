@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,8 +22,32 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
   final _forgotEmailController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _saveLogin = false;
   String? _errorMessage;
   String? _successMessage;
+  final _secureStorage = const FlutterSecureStorage();
+  bool _hasSavedCredentials = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedCredentials();
+  }
+
+  Future<void> _checkSavedCredentials() async {
+    try {
+      final email = await _secureStorage.read(key: 'admin_email');
+      final password = await _secureStorage.read(key: 'admin_password');
+      if (email != null && password != null && email.isNotEmpty && password.isNotEmpty) {
+        setState(() {
+          _emailController.text = email;
+          _passwordController.text = password;
+          _hasSavedCredentials = true;
+          _saveLogin = true;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -61,6 +86,14 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
       if (profileResponse['role'] != 'admin') {
         await Supabase.instance.client.auth.signOut();
         throw const AppAuthException('wrong_role', 'This account is not registered as an admin.');
+      }
+
+      if (_saveLogin) {
+        await _secureStorage.write(key: 'admin_email', value: _emailController.text.trim());
+        await _secureStorage.write(key: 'admin_password', value: _passwordController.text);
+      } else {
+        await _secureStorage.delete(key: 'admin_email');
+        await _secureStorage.delete(key: 'admin_password');
       }
 
       if (mounted) {
@@ -193,6 +226,25 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
             },
           ),
           const SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(
+                height: 24, width: 24,
+                child: Checkbox(
+                  value: _saveLogin,
+                  onChanged: (v) => setState(() => _saveLogin = v ?? false),
+                  activeColor: AppColors.sunsetBright,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => setState(() => _saveLogin = !_saveLogin),
+                child: Text('Save login on this device', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600])),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _buildMessage(),
           SizedBox(
             height: 56,
