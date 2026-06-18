@@ -231,37 +231,75 @@ class _AppShellState extends ConsumerState<AppShell> {
           ActivityScreen(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showQuickActions(context),
-        backgroundColor: AppColors.sunsetBright,
-        foregroundColor: Colors.white,
-        elevation: 8,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, size: 28),
-      ),
-      floatingActionButtonLocation: const _DockedFabLocation(raisedBy: 54),
-      bottomNavigationBar: BottomAppBar(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        elevation: 8,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
-        surfaceTintColor: Colors.transparent,
-        height: 72,
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6,
-        padding: EdgeInsets.zero,
-        child: LayoutBuilder(
-          builder: (context, constraints) => Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                _NavItem(
-                  selected: tab == i,
-                  icon: _tabs[i].icon,
-                  activeIcon: _tabs[i].active,
-                  label: _tabs[i].label,
-                  onTap: () => ref.read(currentTabProvider.notifier).state = i,
-                  itemWidth: constraints.maxWidth / _tabs.length,
-                ),
+      floatingActionButton: ClipPath(
+        clipper: _HalfCircleClipper(),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.sunsetBright, AppColors.sunset],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.sunsetBright.withValues(alpha: 0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
             ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showQuickActions(context),
+              customBorder: const CircleBorder(),
+              child: const SizedBox(
+                width: 48,
+                height: 48,
+                child: Icon(Icons.add, size: 24, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: const _HalfCircleFabLocation(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: BottomAppBar(
+          color: Colors.transparent,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          height: 68,
+          padding: EdgeInsets.zero,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                for (var i = 0; i < _tabs.length; i++)
+                  _NavItem(
+                    selected: tab == i,
+                    icon: _tabs[i].icon,
+                    activeIcon: _tabs[i].active,
+                    label: _tabs[i].label,
+                    onTap: () => ref.read(currentTabProvider.notifier).state = i,
+                    itemWidth: constraints.maxWidth / _tabs.length,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -281,19 +319,37 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
-class _DockedFabLocation extends FloatingActionButtonLocation {
-  const _DockedFabLocation({this.raisedBy = 0});
-  final double raisedBy;
+class _HalfCircleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path()
+      ..addArc(
+        Rect.fromCircle(center: Offset(size.width / 2, 0), radius: size.width / 2),
+        0,
+        3.14,
+      );
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+class _HalfCircleFabLocation extends FloatingActionButtonLocation {
+  const _HalfCircleFabLocation();
 
   @override
   Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    final double fabX = (scaffoldGeometry.scaffoldSize.width - scaffoldGeometry.floatingActionButtonSize.width) / 2;
+    final double fabX = (scaffoldGeometry.scaffoldSize.width - 48) / 2;
     final double fabY = scaffoldGeometry.scaffoldSize.height
-        - scaffoldGeometry.floatingActionButtonSize.height
         - scaffoldGeometry.bottomSheetSize.height
-        - raisedBy;
+        - 68
+        - 24;
     return Offset(fabX, fabY);
   }
+
+  @override
+  String toString() => 'HalfCircleFabLocation';
 }
 
 class _NavItem extends StatelessWidget {
@@ -320,34 +376,54 @@ class _NavItem extends StatelessWidget {
       width: itemWidth,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(100),
-        splashFactory: NoSplash.splashFactory,
-        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        splashFactory: InkRipple.splashFactory,
+        splashColor: AppColors.sunsetBright.withValues(alpha: 0.1),
+        highlightColor: AppColors.sunsetBright.withValues(alpha: 0.05),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 44,
-              height: 32,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: selected ? AppColors.sunsetBright.withValues(alpha: 0.15) : Colors.transparent,
-                borderRadius: BorderRadius.circular(100),
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.sunsetBright.withValues(alpha: 0.2), AppColors.sunset.withValues(alpha: 0.15)],
+                      )
+                    : null,
+                color: selected ? null : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.sunsetBright.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
               ),
               child: Icon(
                 selected ? activeIcon : icon,
-                size: selected ? 26 : 22,
+                size: selected ? 24 : 22,
                 color: selected ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 color: selected ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
-                height: 1.1,
+                height: 1.0,
+                letterSpacing: 0.2,
               ),
             ),
           ],
