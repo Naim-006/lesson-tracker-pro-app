@@ -372,22 +372,25 @@ class _NotchedNavBar extends StatelessWidget {
             right: 0,
             child: SizedBox(
               height: 76,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(tabs.length, (index) {
-                  final isSelected = selectedIndex == index;
-                  final tab = tabs[index];
-                  final isCenter = index == centerIndex;
-                  return _NavBarItem(
-                    icon: isSelected ? tab.active : tab.icon,
-                    label: tab.label,
-                    isSelected: isSelected,
-                    isDark: isDark,
-                    isCenter: isCenter,
-                    onTap: () => onTap(index),
-                  );
-                }),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(tabs.length, (index) {
+                    final isSelected = selectedIndex == index;
+                    final tab = tabs[index];
+                    final isCenter = index == centerIndex;
+                    return _NavBarItem(
+                      icon: isSelected ? tab.active : tab.icon,
+                      label: tab.label,
+                      isSelected: isSelected,
+                      isDark: isDark,
+                      isCenter: isCenter,
+                      onTap: () => onTap(index),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
