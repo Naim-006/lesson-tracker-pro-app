@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/logger.dart';
@@ -31,10 +31,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
   late final TextEditingController _rate;
   GearboxType _gearbox = GearboxType.manual;
 
-  bool _waitingList = false;
-  bool _inviteApp = false;
-  bool _terms = false;
-  bool _requireSignature = false;
   bool _showLocations = false;
   final List<String> _availabilityDays = [];
 
@@ -57,10 +53,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
     );
     if (e != null) {
       _gearbox = e.mechanicalGearboxPreference;
-      _waitingList = e.onWaitingList || e.status == PupilStatus.waiting;
-      _inviteApp = e.inviteToApp;
-      _terms = e.termsAccepted;
-      _requireSignature = e.requireSignatureBeforeBooking;
       _availabilityDays.addAll(e.weeklyAvailabilityDays);
       if (_pickupAddress.text.isNotEmpty || _dropoffAddress.text.isNotEmpty) {
         _showLocations = true;
@@ -84,12 +76,46 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final pupilStatus = _waitingList ? PupilStatus.waiting : PupilStatus.current;
+    const pupilStatus = PupilStatus.current;
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
     try {
+      if (widget.existing == null) {
+        // Check for duplicate email before creating
+        final email = _email.text.trim();
+        if (email.isNotEmpty) {
+          final dupProfile = await Supabase.instance.client
+              .from('profiles')
+              .select('id')
+              .eq('email', email)
+              .maybeSingle();
+          if (dupProfile != null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('A user with this email already exists')),
+              );
+            }
+            return;
+          }
+          final dupInvitation = await Supabase.instance.client
+              .from('pupil_invitations')
+              .select('id')
+              .eq('email', email)
+              .neq('status', 'accepted')
+              .maybeSingle();
+          if (dupInvitation != null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('This email already has a pending invitation')),
+              );
+            }
+            return;
+          }
+        }
+      }
+
       if (widget.existing != null) {
         // Update existing pupil
         await Supabase.instance.client.from('pupils').update({
@@ -100,8 +126,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
           'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-          'invite_to_app': _inviteApp,
-          'terms_accepted': _terms,
         }).eq('id', widget.existing!.id);
 
         await Supabase.instance.client.from('profiles').update({
@@ -117,16 +141,19 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
         Logger.info('Pupil updated: ${_first.text.trim()} ${_last.text.trim()}');
       } else {
         // Create new pupil
-        final profileResult = await Supabase.instance.client.from('profiles').insert({
+        final profileId = const Uuid().v4();
+
+        await Supabase.instance.client.from('profiles').insert({
+          'id': profileId,
           'full_name': '${_first.text.trim()} ${_last.text.trim()}',
           'phone': _phone.text.trim(),
           'email': _email.text.trim(),
-        }).select('id').single();
-
-        final profileId = profileResult['id'];
+          'role': 'pupil',
+        });
 
         await Supabase.instance.client.from('pupils').insert({
           'id': profileId,
+          'instructor_id': user.id,
           'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
           'address': _pickupAddress.text.trim().isEmpty ? null : _pickupAddress.text.trim(),
           'dropoff_address': _dropoffAddress.text.trim().isEmpty ? null : _dropoffAddress.text.trim(),
@@ -134,8 +161,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
           'weekly_availability': _availabilityDays,
           'gearbox_preference': _mapGearboxType(_gearbox),
           'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-          'invite_to_app': _inviteApp,
-          'terms_accepted': _terms,
         });
 
         await Supabase.instance.client.from('instructor_pupil_links').insert({
@@ -310,7 +335,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
+                      if (v == null || v.trim().isEmpty) return 'Required';
                       final trimmed = v.trim();
                       if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
                         return 'Enter a valid email';
@@ -440,7 +465,7 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DropdownButtonFormField<GearboxType>(
-                            value: _gearbox,
+                            initialValue: _gearbox,
                             decoration: InputDecoration(
                               labelText: 'Gearbox',
                               border: InputBorder.none,
@@ -515,64 +540,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
                       );
                     }).toList(),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Options Card
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    title: const Text('Add to waiting list', style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: const Text('Status will be "Waiting" instead of "Current"', style: TextStyle(fontSize: 12)),
-                    value: _waitingList,
-                    onChanged: (v) => setState(() => _waitingList = v),
-                    activeColor: AppColors.sunsetBright,
-                  ),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    title: const Text('Send invite link to companion app', style: TextStyle(fontWeight: FontWeight.w700)),
-                    value: _inviteApp,
-                    onChanged: (v) => setState(() => _inviteApp = v),
-                    activeColor: AppColors.sunsetBright,
-                  ),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    title: const Text('Send terms & conditions', style: TextStyle(fontWeight: FontWeight.w700)),
-                    value: _terms,
-                    onChanged: (v) {
-                      setState(() {
-                        _terms = v;
-                        if (!v) _requireSignature = false;
-                      });
-                    },
-                    activeColor: AppColors.sunsetBright,
-                  ),
-                  if (_terms)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 32, right: 20, bottom: 12),
-                      child: SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Require signature before booking', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                        value: _requireSignature,
-                        onChanged: (v) => setState(() => _requireSignature = v),
-                        activeColor: AppColors.sunsetBright,
-                      ),
-                    ),
                 ],
               ),
             ),

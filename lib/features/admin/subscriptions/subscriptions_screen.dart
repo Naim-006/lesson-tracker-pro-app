@@ -39,7 +39,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
           .order('created_at', ascending: false);
 
       setState(() {
-        _subscriptions = response as List<Map<String, dynamic>>;
+        _subscriptions = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -249,10 +249,11 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(profile?['full_name'] ?? 'Subscription Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text('Instructor: ${profile?['full_name'] ?? 'N/A'}'),
             const SizedBox(height: 8),
             Text('Email: ${profile?['email'] ?? 'N/A'}'),
@@ -265,6 +266,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             const SizedBox(height: 8),
             Text('End: ${_formatDate(subscription['end_date'])}'),
           ],
+        ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
       ),
@@ -394,7 +396,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         content: const Text('Are you sure you want to cancel this subscription?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, Cancel'), style: FilledButton.styleFrom(backgroundColor: AppColors.error)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: AppColors.error), child: const Text('Yes, Cancel')),
         ],
       ),
     );

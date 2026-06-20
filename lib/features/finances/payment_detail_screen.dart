@@ -243,10 +243,11 @@ class PaymentDetailScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Payment Receipt'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text('Amount: ${transaction.amount.toStringAsFixed(2)}'),
             const SizedBox(height: 8),
             Text('Date: ${DateFormat('dd MMM yyyy').format(transaction.date)}'),
@@ -255,6 +256,7 @@ class PaymentDetailScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             Text('Payment Method: ${transaction.paymentMethod != null ? labelEnum(transaction.paymentMethod!) : 'N/A'}'),
           ],
+        ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),

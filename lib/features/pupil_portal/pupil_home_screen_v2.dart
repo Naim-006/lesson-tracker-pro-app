@@ -1,78 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/providers/supabase_pupil_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'slot_request_screen.dart';
 import 'pupil_progress_screen.dart';
 import 'pupil_messaging_screen.dart';
 
 
-class PupilHomeScreenV2 extends StatefulWidget {
+class PupilHomeScreenV2 extends ConsumerStatefulWidget {
   const PupilHomeScreenV2({super.key});
 
   @override
-  State<PupilHomeScreenV2> createState() => _PupilHomeScreenV2State();
+  ConsumerState<PupilHomeScreenV2> createState() => _PupilHomeScreenV2State();
 }
 
-class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
-  final _user = Supabase.instance.client.auth.currentUser;
-  Map<String, dynamic>? _profile;
-  List<Map<String, dynamic>> _upcomingLessons = [];
-  List<Map<String, dynamic>> _progressSkills = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    if (_user == null) return;
-    try {
-      final profileRes = await Supabase.instance.client
-          .from('profiles')
-          .select('*')
-          .eq('id', _user!.id)
-          .single();
-
-      final lessonsRes = await Supabase.instance.client
-          .from('lessons')
-          .select('*, instructors!inner(full_name, business_name)')
-          .eq('pupil_id', _user!.id)
-          .gte('date', DateTime.now().toIso8601String())
-          .order('date', ascending: true)
-          .limit(5);
-
-      final linkRes = await Supabase.instance.client
-          .from('instructor_pupil_links')
-          .select('instructor_id')
-          .eq('pupil_id', _user!.id)
-          .eq('status', 'active')
-          .maybeSingle();
-
-      List<Map<String, dynamic>> skills = [];
-      if (linkRes != null) {
-        final skillsRes = await Supabase.instance.client
-            .from('progress_skills')
-            .select('*, progress_categories!inner(name)')
-            .eq('pupil_id', _user!.id);
-        skills = List<Map<String, dynamic>>.from(skillsRes);
-      }
-
-      if (mounted) {
-        setState(() {
-          _profile = profileRes;
-          _upcomingLessons = List<Map<String, dynamic>>.from(lessonsRes);
-          _progressSkills = skills;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+class _PupilHomeScreenV2State extends ConsumerState<PupilHomeScreenV2> {
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -81,43 +25,68 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
     return 'Good evening';
   }
 
-  String _firstName() {
-    return (_profile?['first_name'] as String?) ?? (_profile?['full_name'] as String?)?.split(' ').first ?? 'there';
+  String _firstName(Map<String, dynamic>? profile) {
+    return (profile?['first_name'] as String?) ?? (profile?['full_name'] as String?)?.split(' ').first ?? 'there';
   }
 
-  double _overallProgress() {
-    if (_progressSkills.isEmpty) return 0.0;
-    final total = _progressSkills.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0));
-    return total / (_progressSkills.length * 5);
+  double _overallProgress(List<Map<String, dynamic>> skills) {
+    if (skills.isEmpty) return 0.0;
+    final total = skills.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0));
+    return total / (skills.length * 5);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final profileAsync = ref.watch(pupilProfileProvider);
+    final upcomingLessonsAsync = ref.watch(pupilUpcomingLessonsProvider);
+    final progressSkillsAsync = ref.watch(pupilProgressSkillsProvider);
 
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
-        : RefreshIndicator(
-            onRefresh: _loadData,
-            color: AppColors.sunsetBright,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(child: _buildHero(isDark)),
-                SliverToBoxAdapter(child: _buildStatChips(isDark)),
-                SliverToBoxAdapter(child: _buildUpNext(isDark)),
-                SliverToBoxAdapter(child: _buildQuickActions(isDark)),
-                SliverToBoxAdapter(child: _buildProgressSnapshot(isDark)),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ],
-            ),
-          );
+    return profileAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright)),
+      error: (_, __) => const Center(child: Text('Error loading profile')),
+      data: (profile) {
+        return upcomingLessonsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright)),
+          error: (_, __) => const Center(child: Text('Error loading lessons')),
+          data: (upcomingLessons) {
+            return progressSkillsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright)),
+              error: (_, __) => const Center(child: Text('Error loading progress')),
+              data: (progressSkills) {
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(pupilProfileProvider);
+                    ref.invalidate(pupilUpcomingLessonsProvider);
+                    ref.invalidate(pupilProgressSkillsProvider);
+                  },
+                  color: AppColors.sunsetBright,
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildHero(isDark, profile)),
+                      SliverToBoxAdapter(child: _buildStatChips(isDark, upcomingLessons, progressSkills)),
+                      SliverToBoxAdapter(child: _buildUpNext(isDark, upcomingLessons)),
+                      SliverToBoxAdapter(child: _buildQuickActions(isDark)),
+                      SliverToBoxAdapter(child: _buildProgressSnapshot(isDark, progressSkills)),
+                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   // ─── Hero Section ─────────────────────────────────────────
-  Widget _buildHero(bool isDark) {
+  Widget _buildHero(bool isDark, Map<String, dynamic>? profile) {
     final now = DateTime.now();
     final dateStr = DateFormat('EEEE, MMM d').format(now);
+    final firstName = _firstName(profile);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -162,7 +131,7 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${_greeting()}, ${_firstName()}',
+                        '${_greeting()}, $firstName',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
@@ -183,7 +152,7 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
                   ),
                   child: Center(
                     child: Text(
-                      _firstName().isNotEmpty ? _firstName()[0].toUpperCase() : '?',
+                      firstName.isNotEmpty ? firstName[0].toUpperCase() : '?',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -226,10 +195,10 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
   }
 
   // ─── Stat Chips ───────────────────────────────────────────
-  Widget _buildStatChips(bool isDark) {
-    final nextLesson = _upcomingLessons.isNotEmpty ? _upcomingLessons.first : null;
-    final progress = _overallProgress();
-    final totalHours = _progressSkills.length * 0.5; // rough estimate
+  Widget _buildStatChips(bool isDark, List<Map<String, dynamic>> upcomingLessons, List<Map<String, dynamic>> progressSkills) {
+    final nextLesson = upcomingLessons.isNotEmpty ? upcomingLessons.first : null;
+    final progress = _overallProgress(progressSkills);
+    final totalHours = progressSkills.length * 0.5; // rough estimate
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -278,8 +247,8 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
   }
 
   // ─── Up Next Card ─────────────────────────────────────────
-  Widget _buildUpNext(bool isDark) {
-    if (_upcomingLessons.isEmpty) {
+  Widget _buildUpNext(bool isDark, List<Map<String, dynamic>> upcomingLessons) {
+    if (upcomingLessons.isEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: GestureDetector(
@@ -337,7 +306,7 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
       );
     }
 
-    final lesson = _upcomingLessons.first;
+    final lesson = upcomingLessons.first;
     final instructor = lesson['instructors'];
     final date = DateTime.parse(lesson['date']);
     final name = instructor?['full_name'] ?? instructor?['business_name'] ?? 'Instructor';
@@ -445,11 +414,14 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
               children: [
                 Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white.withValues(alpha: 0.7)),
                 const SizedBox(width: 6),
-                Text(
-                  DateFormat('EEEE, MMM d · h:mm a').format(date),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
+                Flexible(
+                  child: Text(
+                    DateFormat('EEEE, MMM d · h:mm a').format(date),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -526,12 +498,12 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
   }
 
   // ─── Progress Snapshot ────────────────────────────────────
-  Widget _buildProgressSnapshot(bool isDark) {
-    if (_progressSkills.isEmpty) return const SizedBox.shrink();
+  Widget _buildProgressSnapshot(bool isDark, List<Map<String, dynamic>> progressSkills) {
+    if (progressSkills.isEmpty) return const SizedBox.shrink();
 
-    final progress = _overallProgress();
+    final progress = _overallProgress(progressSkills);
     final grouped = <String, List<Map<String, dynamic>>>{};
-    for (final s in _progressSkills) {
+    for (final s in progressSkills) {
       final cat = s['progress_categories']?['name'] ?? 'Other';
       grouped.putIfAbsent(cat, () => []).add(s);
     }
@@ -544,20 +516,27 @@ class _PupilHomeScreenV2State extends State<PupilHomeScreenV2> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Your Progress',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : Colors.black87,
+              Expanded(
+                child: Text(
+                  'Your Progress',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  maxLines: 1,
                 ),
               ),
-              Text(
-                '${(progress * 100).toInt()}% overall',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.sunsetBright,
+              Flexible(
+                child: Text(
+                  '${(progress * 100).toInt()}% overall',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.sunsetBright,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -673,6 +652,8 @@ class _StatChip extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

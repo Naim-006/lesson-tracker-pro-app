@@ -45,7 +45,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           .order('payment_date', ascending: false);
 
       setState(() {
-        _payments = response as List<Map<String, dynamic>>;
+        _payments = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -81,7 +81,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedMethod,
+                  initialValue: selectedMethod,
                   decoration: const InputDecoration(
                     labelText: 'Payment Method',
                     border: OutlineInputBorder(),
@@ -110,6 +110,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   );
                   return;
                 }
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
                 try {
                   await Supabase.instance.client.from('instructor_payments').insert({
@@ -118,18 +119,16 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     'status': 'pending',
                     'payment_method': selectedMethod,
                   });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Payment created successfully')),
-                    );
-                    _loadPayments();
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Payment created successfully')),
+                  );
+                  _loadPayments();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create payment: $e')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Failed to create payment: $e')),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.sunset),
@@ -203,8 +202,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: valueColor)),
+          Flexible(
+            child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)), overflow: TextOverflow.ellipsis, maxLines: 1),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: valueColor), overflow: TextOverflow.ellipsis, maxLines: 1, textAlign: TextAlign.end),
+          ),
         ],
       ),
     );
@@ -463,7 +467,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: isProcessing || id == null
                       ? null
-                      : () => _approvePayment(id!),
+                      : () => _approvePayment(id),
                   icon: isProcessing
                       ? const SizedBox(
                           width: 16,
@@ -479,7 +483,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: isProcessing || id == null
                       ? null
-                      : () => _rejectPayment(id!),
+                      : () => _rejectPayment(id),
                   icon: isProcessing
                       ? const SizedBox(
                           width: 16,

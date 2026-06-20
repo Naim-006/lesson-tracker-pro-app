@@ -46,8 +46,8 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
           .limit(20);
 
       setState(() {
-        _activityLogs = activityResponse as List<Map<String, dynamic>>;
-        _locationHistory = locationResponse as List<Map<String, dynamic>>;
+        _activityLogs = activityResponse;
+        _locationHistory = locationResponse;
         _isLoading = false;
       });
     } catch (e) {
@@ -228,9 +228,13 @@ class _InstructorMonitoringScreenState extends ConsumerState<InstructorMonitorin
             children: [
               Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 4),
-              Text(
-                timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              Flexible(
+                child: Text(
+                  timestamp != null ? _formatTimestamp(timestamp) : 'N/A',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
               const SizedBox(width: 16),
               if (accuracy != null) ...[

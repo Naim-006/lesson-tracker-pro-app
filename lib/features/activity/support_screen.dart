@@ -64,7 +64,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
           .limit(100);
 
       setState(() {
-        _messages = (response as List<Map<String, dynamic>>)
+        _messages = (response)
             .toList()
             ..sort((a, b) => DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at'])));
         _isLoading = false;

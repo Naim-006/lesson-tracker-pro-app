@@ -52,7 +52,7 @@ class _PupilInvitationScreenState extends ConsumerState<PupilInvitationScreen> {
           .order('created_at', ascending: false);
 
       setState(() {
-        _invitations = response as List<Map<String, dynamic>>;
+        _invitations = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -246,10 +246,8 @@ class _PupilInvitationScreenState extends ConsumerState<PupilInvitationScreen> {
     final email = invitation['email'] as String?;
     final firstName = invitation['first_name'] as String?;
     final lastName = invitation['last_name'] as String?;
-    final phone = invitation['phone'] as String?;
     final invitationCode = invitation['invitation_code'] as String?;
     final status = invitation['status'] as String?;
-    final createdAt = invitation['created_at'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

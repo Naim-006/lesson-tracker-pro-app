@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/models.dart';
-import '../../core/theme/app_colors.dart';
 
 class ExpenseCategoryPickerScreen extends StatelessWidget {
   const ExpenseCategoryPickerScreen({super.key});

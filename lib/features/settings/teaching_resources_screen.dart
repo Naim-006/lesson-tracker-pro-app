@@ -4,8 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -166,35 +164,35 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Resource'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<ResourceType>(
-                    value: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
-                    items: ResourceType.values
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase())))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => type = v!),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: const ['Lesson Plans', 'Handouts', 'Assessment', 'Videos']
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => category = v!),
-                  ),
+                        title: const Text('Add Resource'),
+                        content: SizedBox(
+                          width: double.maxFinite,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(
+                                  controller: titleController,
+                                  decoration: const InputDecoration(labelText: 'Title'),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<ResourceType>(
+                                  initialValue: type,
+                                  decoration: const InputDecoration(labelText: 'Type'),
+                                  items: ResourceType.values
+                                      .map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase())))
+                                      .toList(),
+                                  onChanged: (v) => setDialogState(() => type = v!),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  initialValue: category,
+                                  decoration: const InputDecoration(labelText: 'Category'),
+                                  items: const ['Lesson Plans', 'Handouts', 'Assessment', 'Videos']
+                                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                      .toList(),
+                                  onChanged: (v) => setDialogState(() => category = v!),
+                                ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: descriptionController,
@@ -219,21 +217,21 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
                   const SizedBox(height: 12),
                   const Text('Visibility', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Row(
-                    children: ResourceVisibility.values.map((v) {
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Radio<ResourceVisibility>(
-                            value: v,
-                            groupValue: visibility,
-                            onChanged: (val) => setDialogState(() => visibility = val!),
-                          ),
-                          Text(v.name.toUpperCase()),
-                          const SizedBox(width: 16),
-                        ],
-                      );
-                    }).toList(),
+                  RadioGroup<ResourceVisibility>(
+                    groupValue: visibility,
+                    onChanged: (val) => setDialogState(() => visibility = val!),
+                    child: Wrap(
+                      children: ResourceVisibility.values.map((v) {
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Radio<ResourceVisibility>(value: v),
+                            Text(v.name.toUpperCase(), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                          ],
+                        );
+                      }).toList(),
+                    ),
                   ),
                   if (visibility == ResourceVisibility.selective) ...[
                     const SizedBox(height: 12),
@@ -281,18 +279,18 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
                   ));
                   resourceData['instructor_id'] = user.id;
 
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(ctx);
                   try {
                     await Supabase.instance.client.from('teaching_resources').insert(resourceData);
-                    if (mounted) {
-                      Navigator.pop(ctx);
-                      ref.invalidate(instructorTeachingResourcesProvider);
-                    }
+                    if (!mounted) return;
+                    navigator.pop();
+                    ref.invalidate(instructorTeachingResourcesProvider);
                   } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: ${e.toString()}')),
-                      );
-                    }
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
                   }
                 }
               },
@@ -319,35 +317,35 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Resource'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<ResourceType>(
-                    value: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
-                    items: ResourceType.values
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase())))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => type = v!),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: const ['Lesson Plans', 'Handouts', 'Assessment', 'Videos']
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => category = v!),
-                  ),
+                        title: const Text('Edit Resource'),
+                        content: SizedBox(
+                          width: double.maxFinite,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(
+                                  controller: titleController,
+                                  decoration: const InputDecoration(labelText: 'Title'),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<ResourceType>(
+                                  initialValue: type,
+                                  decoration: const InputDecoration(labelText: 'Type'),
+                                  items: ResourceType.values
+                                      .map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase())))
+                                      .toList(),
+                                  onChanged: (v) => setDialogState(() => type = v!),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  initialValue: category,
+                                  decoration: const InputDecoration(labelText: 'Category'),
+                                  items: const ['Lesson Plans', 'Handouts', 'Assessment', 'Videos']
+                                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                      .toList(),
+                                  onChanged: (v) => setDialogState(() => category = v!),
+                                ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: descriptionController,
@@ -372,21 +370,21 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
                   const SizedBox(height: 12),
                   const Text('Visibility', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Row(
-                    children: ResourceVisibility.values.map((v) {
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Radio<ResourceVisibility>(
-                            value: v,
-                            groupValue: visibility,
-                            onChanged: (val) => setDialogState(() => visibility = val!),
-                          ),
-                          Text(v.name.toUpperCase()),
-                          const SizedBox(width: 16),
-                        ],
-                      );
-                    }).toList(),
+                  RadioGroup<ResourceVisibility>(
+                    groupValue: visibility,
+                    onChanged: (val) => setDialogState(() => visibility = val!),
+                    child: Wrap(
+                      children: ResourceVisibility.values.map((v) {
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Radio<ResourceVisibility>(value: v),
+                            Text(v.name.toUpperCase(), style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                          ],
+                        );
+                      }).toList(),
+                    ),
                   ),
                   if (visibility == ResourceVisibility.selective) ...[
                     const SizedBox(height: 12),
@@ -429,21 +427,21 @@ class _TeachingResourcesScreenState extends ConsumerState<TeachingResourcesScree
                   selectedPupilIds: selectedPupilIds.toList(),
                 );
 
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(ctx);
                 try {
                   await Supabase.instance.client
                       .from('teaching_resources')
                       .update(_resourceToMap(updatedResource))
                       .eq('id', resource.id);
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ref.invalidate(instructorTeachingResourcesProvider);
-                  }
+                  if (!mounted) return;
+                  navigator.pop();
+                  ref.invalidate(instructorTeachingResourcesProvider);
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: ${e.toString()}')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
+                  );
                 }
               },
               child: const Text('Save'),
@@ -659,27 +657,33 @@ class _ResourceCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      resource.category,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        resource.category,
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _getVisibilityColor(resource.visibility).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      resource.visibility.name.toUpperCase(),
-                      style: TextStyle(fontSize: 10, color: _getVisibilityColor(resource.visibility)),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getVisibilityColor(resource.visibility).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        resource.visibility.name.toUpperCase(),
+                        style: TextStyle(fontSize: 10, color: _getVisibilityColor(resource.visibility)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),

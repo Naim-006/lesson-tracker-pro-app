@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/logger.dart';
@@ -561,33 +560,35 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Notes'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Add notes'),
-          maxLines: 5,
+        content: SingleChildScrollView(
+          child: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'Add notes'),
+            maxLines: 5,
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(ctx);
               try {
                 await Supabase.instance.client
                     .from('pupils')
                     .update({'notes': controller.text.trim()})
                     .eq('id', pupil.id);
-                if (mounted) {
-                  ref.invalidate(instructorPupilsProvider);
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notes saved')),
-                  );
-                }
+                if (!mounted) return;
+                ref.invalidate(instructorPupilsProvider);
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Notes saved')),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(userFriendlyError(e))),
-                  );
-                }
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text(userFriendlyError(e))),
+                );
               }
             },
             child: const Text('Save'),

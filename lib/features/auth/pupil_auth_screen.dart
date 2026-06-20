@@ -30,9 +30,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
   String? _errorMessage;
   String? _successMessage;
   final _secureStorage = const FlutterSecureStorage();
-  bool _hasSavedCredentials = false;
-  bool _emailNotConfirmed = false;
-  DateTime? _lastResendTime;
 
   @override
   void initState() {
@@ -48,7 +45,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
         setState(() {
           _emailController.text = email;
           _passwordController.text = password;
-          _hasSavedCredentials = true;
           _saveLogin = true;
         });
       }
@@ -72,17 +68,15 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
     }
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; _emailNotConfirmed = false; });
+    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; });
 
     try {
       if (_isLogin) { await _login(); } else { await _signup(); }
     } on AppAuthException catch (e) {
       setState(() => _errorMessage = e.message);
-      if (e.code == 'email_unconfirmed') _emailNotConfirmed = true;
     } catch (e) {
       final err = AppAuthException.fromSupabase(e);
       setState(() => _errorMessage = err.message);
-      if (err.code == 'email_unconfirmed') _emailNotConfirmed = true;
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -107,18 +101,13 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
 
     final profileResponse = await Supabase.instance.client
         .from('profiles')
-        .select('role, email_verified')
+        .select('role')
         .eq('id', response.user!.id)
         .single();
 
     if (profileResponse['role'] != 'pupil') {
       await Supabase.instance.client.auth.signOut();
       throw const AppAuthException('wrong_role', 'This account is not registered as a pupil.');
-    }
-
-    if (profileResponse['email_verified'] != true) {
-      await Supabase.instance.client.auth.signOut();
-      throw const AppAuthException('email_unconfirmed', 'Please verify your email before logging in.');
     }
 
     try {
@@ -165,11 +154,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
   Future<void> _signup() async {
     final email = _emailController.text.trim().toLowerCase();
 
-    final exists = await checkEmailExists(email);
-    if (exists) {
-      throw const AppAuthException('email_exists', 'An account with this email already exists. Try logging in instead.');
-    }
-
     Map<String, dynamic> invitation;
     try {
       final result = await Supabase.instance.client
@@ -188,23 +172,35 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
       throw const AppAuthException('verification_failed', 'Could not verify your invitation. Please try again later.');
     }
 
-    final response = await Supabase.instance.client.auth.signUp(
-      email: email,
-      password: _passwordController.text,
-      data: {
-        'full_name': _fullNameController.text.trim(),
-        'role': 'pupil',
-      },
-    );
+    final fullName = _fullNameController.text.trim();
+
+    AuthResponse response;
+    try {
+      response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: _passwordController.text,
+        data: {
+          'full_name': fullName.isNotEmpty ? fullName : invitation['first_name'] ?? '',
+          'role': 'pupil',
+        },
+      );
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('user already registered') || msg.contains('already exists')) {
+        throw const AppAuthException('email_exists', 'This email is already registered. Please login instead.');
+      }
+      throw const AppAuthException('signup_failed', 'Could not create your account. Please try again later.');
+    }
 
     if (response.user != null) {
       try {
+        final fullName = _fullNameController.text.trim();
         await Supabase.instance.client.from('pupils').insert({
           'id': response.user!.id,
           'instructor_id': invitation['instructor_id'],
           'email': email,
-          'first_name': invitation['first_name'] ?? _fullNameController.text.trim().split(' ').first,
-          'last_name': invitation['last_name'] ?? '',
+          'first_name': fullName.isNotEmpty ? fullName.split(' ').first : (invitation['first_name'] ?? ''),
+          'last_name': fullName.isNotEmpty && fullName.contains(' ') ? fullName.split(' ').sublist(1).join(' ') : (invitation['last_name'] ?? ''),
           'phone': invitation['phone'] ?? '',
           'postcode': invitation['postcode'],
           'status': 'current',
@@ -241,28 +237,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
         _successMessage = 'If an account exists with $email, a password reset link has been sent. Check your inbox (and spam folder).';
         _showForgotPassword = false;
       });
-    } catch (e) {
-      setState(() => _errorMessage = AppAuthException.fromSupabase(e).message);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _resendVerification() async {
-    if (_lastResendTime != null && DateTime.now().difference(_lastResendTime!).inSeconds < 60) {
-      final remaining = 60 - DateTime.now().difference(_lastResendTime!).inSeconds;
-      setState(() => _errorMessage = 'Please wait $remaining seconds before requesting another email.');
-      return;
-    }
-
-    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; });
-
-    try {
-      await Supabase.instance.client.auth.resend(type: OtpType.signup, email: _emailController.text.trim());
-      _lastResendTime = DateTime.now();
-      if (mounted) {
-        setState(() { _successMessage = 'A new verification email has been sent to ${_emailController.text}. Check your inbox.'; });
-      }
     } catch (e) {
       setState(() => _errorMessage = AppAuthException.fromSupabase(e).message);
     } finally {
@@ -443,7 +417,7 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
             children: [
               Text(_isLogin ? "Don't have an account? " : 'Already have an account? ', style: GoogleFonts.poppins(color: Colors.grey[600])),
               TextButton(
-                onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; _successMessage = null; _emailNotConfirmed = false; }),
+                onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; _successMessage = null; }),
                 child: Text(_isLogin ? 'Sign Up' : 'Login', style: GoogleFonts.poppins(color: Colors.blue, fontWeight: FontWeight.w600)),
               ),
             ],

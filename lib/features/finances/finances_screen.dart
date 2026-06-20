@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
@@ -96,7 +94,6 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Material(
                       color: Colors.transparent,
@@ -114,19 +111,23 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        DateFormat('MMMM yyyy').format(_focusedMonth).toUpperCase(),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppColors.sunsetBright,
-                          letterSpacing: 0.8,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.sunsetBright.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          DateFormat('MMMM yyyy').format(_focusedMonth).toUpperCase(),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppColors.sunsetBright,
+                            letterSpacing: 0.8,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -430,10 +431,11 @@ class _TransactionTile extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: AppColors.lightMuted),
           ),
         ])),
-        Text(
+        Flexible(child: Text(
           '${isIncome ? '+' : '-'}$sym${t.amount.toStringAsFixed(2)}',
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: isIncome ? AppColors.success : AppColors.error),
-        ),
+          overflow: TextOverflow.ellipsis,
+        )),
       ]),
     );
   }

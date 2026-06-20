@@ -12,7 +12,6 @@ class TheoryTestProSyncScreen extends ConsumerStatefulWidget {
 
 class _TheoryTestProSyncScreenState extends ConsumerState<TheoryTestProSyncScreen> {
   bool _syncEnabled = false;
-  String _apiKey = '';
   bool _autoSync = true;
 
   @override
@@ -84,7 +83,7 @@ class _TheoryTestProSyncScreenState extends ConsumerState<TheoryTestProSyncScree
               subtitle: const Text('Sync pupil data with Theory Test Pro', style: TextStyle(fontSize: 13, color: Colors.grey)),
               value: _syncEnabled,
               onChanged: (v) => setState(() => _syncEnabled = v),
-              activeColor: AppColors.sunsetBright,
+              activeThumbColor: AppColors.sunsetBright,
             ),
           ),
           const SizedBox(height: 24),
@@ -118,7 +117,6 @@ class _TheoryTestProSyncScreenState extends ConsumerState<TheoryTestProSyncScree
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.all(16),
                     ),
-                    onChanged: (v) => setState(() => _apiKey = v),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -150,7 +148,7 @@ class _TheoryTestProSyncScreenState extends ConsumerState<TheoryTestProSyncScree
                 subtitle: const Text('Automatically sync pupil progress', style: TextStyle(fontSize: 13, color: Colors.grey)),
                 value: _autoSync,
                 onChanged: (v) => setState(() => _autoSync = v),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
             ),
             const SizedBox(height: 24),

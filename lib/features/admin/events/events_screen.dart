@@ -35,7 +35,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
           .order('event_date', ascending: false);
 
       setState(() {
-        _events = response as List<Map<String, dynamic>>;
+        _events = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -326,6 +326,8 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
           ),
           FilledButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
               try {
                 await Supabase.instance.client.from('events').insert({
                   'title': titleController.text.trim(),
@@ -333,16 +335,14 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                   'event_date': eventDateController.text,
                   'is_published': false,
                 });
-                if (mounted) {
-                  Navigator.pop(context);
-                  _loadEvents();
-                }
+                if (!mounted) return;
+                navigator.pop();
+                _loadEvents();
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error creating event: $e')),
-                  );
-                }
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Error creating event: $e')),
+                );
               }
             },
             child: const Text('Create'),
@@ -396,6 +396,8 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
           ),
           FilledButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
               try {
                 await Supabase.instance.client
                     .from('events')
@@ -405,16 +407,14 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                       'event_date': eventDateController.text,
                     })
                     .eq('id', event['id']);
-                if (mounted) {
-                  Navigator.pop(context);
-                  _loadEvents();
-                }
+                if (!mounted) return;
+                navigator.pop();
+                _loadEvents();
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating event: $e')),
-                  );
-                }
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Error updating event: $e')),
+                );
               }
             },
             child: const Text('Save'),

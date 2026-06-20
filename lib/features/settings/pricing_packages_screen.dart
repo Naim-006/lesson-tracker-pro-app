@@ -138,9 +138,10 @@ class _PricingPackagesScreenState extends ConsumerState<PricingPackagesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Custom Package'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(
               controller: titleController,
               decoration: const InputDecoration(labelText: 'Package Title'),
@@ -158,6 +159,7 @@ class _PricingPackagesScreenState extends ConsumerState<PricingPackagesScreen> {
               decoration: const InputDecoration(labelText: 'Discount (%)'),
             ),
           ],
+        ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

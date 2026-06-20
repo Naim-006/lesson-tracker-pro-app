@@ -39,7 +39,7 @@ class _InstructorPaymentRequestsScreenState extends ConsumerState<InstructorPaym
           .order('request_date', ascending: false);
 
       setState(() {
-        _requests = response as List<Map<String, dynamic>>;
+        _requests = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -125,11 +125,15 @@ class _InstructorPaymentRequestsScreenState extends ConsumerState<InstructorPaym
                   color: Colors.white,
                   child: Row(
                     children: [
-                      const Text(
-                        'Instructor Payment Requests',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                      const Flexible(
+                        child: Text(
+                          'Payment Requests',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const Spacer(),

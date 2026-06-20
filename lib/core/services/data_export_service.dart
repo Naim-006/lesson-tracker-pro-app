@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../core/providers/app_state_provider.dart';
+import '../../core/models/models.dart';
 import '../../core/utils/logger.dart';
 
 class DataExportService {
@@ -11,17 +10,22 @@ class DataExportService {
     try {
       Logger.info('Starting data export');
       
-      // Convert app state to JSON
+      final payments = appState.transactions
+          .where((t) => t.type == TransactionType.income)
+          .toList();
+      final expenses = appState.transactions
+          .where((t) => t.type == TransactionType.expense)
+          .toList();
+
       final Map<String, dynamic> dataMap = {
         'pupils': appState.pupils.map((p) => p.toJson()).toList(),
         'lessons': appState.lessons.map((l) => l.toJson()).toList(),
-        'payments': appState.payments.map((p) => p.toJson()).toList(),
-        'expenses': appState.expenses.map((e) => e.toJson()).toList(),
-        'mileage': appState.mileage.map((m) => m.toJson()).toList(),
+        'payments': payments.map((p) => p.toJson()).toList(),
+        'expenses': expenses.map((e) => e.toJson()).toList(),
+        'mileage': appState.mileageEntries.map((m) => m.toJson()).toList(),
         'openSlots': appState.openSlots.map((s) => s.toJson()).toList(),
         'notifications': appState.notifications.map((n) => n.toJson()).toList(),
         'enquiries': appState.enquiries.map((e) => e.toJson()).toList(),
-        'settings': appState.settings.toJson(),
         'exportDate': DateTime.now().toIso8601String(),
         'appVersion': '1.0.0',
       };
@@ -127,13 +131,13 @@ class DataExportService {
     return buffer.toString();
   }
   
-  static String _generatePaymentsCSV(List payments) {
+  static String _generatePaymentsCSV(List<Transaction> payments) {
     final buffer = StringBuffer();
     buffer.writeln('Date,Amount,Pupil ID,Method,Type,Category');
     
     for (final payment in payments) {
       buffer.writeln(
-        '${payment.date},${payment.amount},${payment.pupilId},${payment.method},${payment.type},${payment.category}'
+        '${payment.date},${payment.amount},${payment.pupilId},${payment.paymentMethod},${payment.type},${payment.category}'
       );
     }
     

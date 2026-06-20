@@ -447,6 +447,8 @@ class _MiniStat extends StatelessWidget {
                 fontSize: 11,
                 color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

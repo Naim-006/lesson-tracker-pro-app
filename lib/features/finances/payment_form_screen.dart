@@ -5,11 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/logger.dart';
-import '../../core/widgets/api_error_modal.dart';
 import '../../core/utils/error_handler.dart';
 import 'income_category_picker_screen.dart';
 
@@ -63,7 +61,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     );
 
     if (source != null) {
-      final image = await _picker.pickImage(source: source!);
+      final image = await _picker.pickImage(source: source);
       if (image != null) {
         setState(() => _receiptPath = image.path);
       }
@@ -75,9 +73,10 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Enter Amount'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Text(
               _amount.text.isEmpty ? '£0.00' : '£${_amount.text}',
               style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
@@ -122,6 +121,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
               ],
             ),
           ],
+        ),
         ),
       ),
     );
@@ -202,7 +202,6 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     switch (type) {
       case PaymentType.individual: return 'individual';
       case PaymentType.block: return 'block';
-      default: return 'individual';
     }
   }
 
@@ -496,7 +495,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<PaymentType>(
-                      value: _paymentType,
+                      initialValue: _paymentType,
                       decoration: InputDecoration(
                         labelText: 'Payment type',
                         border: InputBorder.none,

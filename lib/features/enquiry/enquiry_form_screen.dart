@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -132,7 +131,6 @@ class _EnquiryFormScreenState extends ConsumerState<EnquiryFormScreen> {
       case ExperienceLevel.beginner: return 'beginner';
       case ExperienceLevel.intermediate: return 'intermediate';
       case ExperienceLevel.advanced: return 'advanced';
-      default: return 'beginner';
     }
   }
 
@@ -414,7 +412,7 @@ class _EnquiryFormScreenState extends ConsumerState<EnquiryFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<GearboxType>(
-                      value: _gearbox,
+                      initialValue: _gearbox,
                       decoration: InputDecoration(
                         labelText: 'Transmission Preference',
                         border: InputBorder.none,
@@ -433,7 +431,7 @@ class _EnquiryFormScreenState extends ConsumerState<EnquiryFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<ExperienceLevel>(
-                      value: _experience,
+                      initialValue: _experience,
                       decoration: InputDecoration(
                         labelText: 'Experience Level',
                         border: InputBorder.none,
@@ -479,7 +477,7 @@ class _EnquiryFormScreenState extends ConsumerState<EnquiryFormScreen> {
                       title: const Text('Has Provisional Licence', style: TextStyle(fontWeight: FontWeight.w700)),
                       value: _hasProvisional,
                       onChanged: (v) => setState(() => _hasProvisional = v),
-                      activeColor: AppColors.sunsetBright,
+                      activeThumbColor: AppColors.sunsetBright,
                     ),
                   ),
                 ],

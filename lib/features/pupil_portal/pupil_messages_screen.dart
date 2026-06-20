@@ -235,6 +235,8 @@ class _ConversationTile extends StatelessWidget {
                           fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w600,
                           color: isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
                       Text(

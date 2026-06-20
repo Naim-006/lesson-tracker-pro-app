@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -88,7 +87,6 @@ class _TestReportFormScreenState extends ConsumerState<TestReportFormScreen> {
       case TestResult.pass: return 'pass';
       case TestResult.fail: return 'fail';
       case TestResult.pending: return 'pending';
-      default: return 'pending';
     }
   }
 
@@ -145,7 +143,7 @@ class _TestReportFormScreenState extends ConsumerState<TestReportFormScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButtonFormField<Pupil>(
-              value: _pupil,
+              initialValue: _pupil,
               decoration: InputDecoration(
                 labelText: 'Pupil',
                 border: InputBorder.none,
@@ -242,7 +240,7 @@ class _TestReportFormScreenState extends ConsumerState<TestReportFormScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButtonFormField<TestResult>(
-                    value: _result,
+                    initialValue: _result,
                     decoration: InputDecoration(
                       labelText: 'Result',
                       border: InputBorder.none,

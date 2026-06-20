@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -86,7 +85,7 @@ class _DrivingTestSuccessSyncScreenState extends ConsumerState<DrivingTestSucces
               subtitle: const Text('Sync pupil data with Driving Test Success', style: TextStyle(fontSize: 13, color: Colors.grey)),
               value: _syncEnabled,
               onChanged: (v) => setState(() => _syncEnabled = v),
-              activeColor: AppColors.sunsetBright,
+              activeThumbColor: AppColors.sunsetBright,
             ),
           ),
           const SizedBox(height: 24),
@@ -152,7 +151,7 @@ class _DrivingTestSuccessSyncScreenState extends ConsumerState<DrivingTestSucces
                 subtitle: const Text('Automatically sync pupil progress', style: TextStyle(fontSize: 13, color: Colors.grey)),
                 value: _autoSync,
                 onChanged: (v) => setState(() => _autoSync = v),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
             ),
             const SizedBox(height: 24),

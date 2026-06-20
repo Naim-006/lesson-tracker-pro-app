@@ -304,11 +304,13 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
           .update({'status': 'paid'})
           .eq('id', invoice['id']);
 
+      if (!mounted) return;
       _loadData();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payment successful')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment failed: $e')),
       );
@@ -462,18 +464,21 @@ class _InvoiceCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(status).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status.toUpperCase(),
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _getStatusColor(status),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(status).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _getStatusColor(status),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
@@ -493,11 +498,14 @@ class _InvoiceCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _formatDate(createdAt),
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[500],
+                Flexible(
+                  child: Text(
+                    _formatDate(createdAt),
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (status == 'pending')
@@ -591,12 +599,15 @@ class _PaymentCard extends StatelessWidget {
                 ],
               ),
             ),
-            Text(
-              '${payment['type'] == 'income' ? '+' : '-'}£${payment['amount']}',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getTypeColor(payment['type']),
+            Flexible(
+              child: Text(
+                '${payment['type'] == 'income' ? '+' : '-'}£${payment['amount']}',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _getTypeColor(payment['type']),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

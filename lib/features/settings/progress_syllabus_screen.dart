@@ -65,7 +65,7 @@ class _ProgressSyllabusScreenState extends ConsumerState<ProgressSyllabusScreen>
                   const SnackBar(content: Text('Progress tracking updated')),
                 );
               },
-              activeColor: AppColors.sunsetBright,
+              activeThumbColor: AppColors.sunsetBright,
             ),
           ),
           const SizedBox(height: 24),
@@ -196,9 +196,10 @@ class _ProgressSyllabusScreenState extends ConsumerState<ProgressSyllabusScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Custom Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(
               controller: titleController,
               decoration: const InputDecoration(labelText: 'Category Title'),
@@ -210,6 +211,7 @@ class _ProgressSyllabusScreenState extends ConsumerState<ProgressSyllabusScreen>
               maxLines: 2,
             ),
           ],
+        ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

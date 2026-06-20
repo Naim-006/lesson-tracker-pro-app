@@ -54,9 +54,10 @@ class QuickAddSheet extends ConsumerWidget {
             ),
             child: SafeArea(
               top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   const SizedBox(height: 12),
                   Container(
                     width: 36, height: 4,
@@ -151,6 +152,7 @@ class QuickAddSheet extends ConsumerWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

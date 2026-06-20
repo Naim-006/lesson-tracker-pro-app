@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../diary/open_slot_form_screen.dart';
@@ -72,7 +71,7 @@ class _PupilsScreenState extends ConsumerState<PupilsScreen>
 
   void _showImportContactsComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact import coming soon')),
+      const SnackBar(content: Text('Add pupils manually using the + button, or send an invitation link from a pupil\'s profile.')),
     );
   }
 
@@ -398,7 +397,7 @@ class _PupilTile extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _statusColor(pupil.status).withOpacity(0.15),
+                            color: _statusColor(pupil.status).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(

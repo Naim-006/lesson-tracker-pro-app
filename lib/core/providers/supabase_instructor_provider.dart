@@ -1,15 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_state_provider.dart';
 
 // Provider for instructor profile
 final instructorProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return null;
 
   try {
     final response = await Supabase.instance.client
-        .from('instructors')
-        .select('*, profiles!inner(full_name, email, avatar_url)')
+        .from('profiles')
+        .select('*')
         .eq('id', user.id)
         .single();
 
@@ -21,6 +23,7 @@ final instructorProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) as
 
 // Provider for instructor's pupils
 final instructorPupilsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -38,6 +41,7 @@ final instructorPupilsProvider = FutureProvider<List<Map<String, dynamic>>>((ref
 
 // Provider for instructor's lessons
 final instructorLessonsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -56,6 +60,7 @@ final instructorLessonsProvider = FutureProvider<List<Map<String, dynamic>>>((re
 
 // Provider for instructor's open slots
 final instructorSlotsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -76,6 +81,7 @@ final instructorSlotsProvider = FutureProvider<List<Map<String, dynamic>>>((ref)
 
 // Provider for instructor's enquiries
 final instructorEnquiriesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -94,12 +100,13 @@ final instructorEnquiriesProvider = FutureProvider<List<Map<String, dynamic>>>((
 
 // Provider for instructor's payments
 final instructorPaymentsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
   try {
     final response = await Supabase.instance.client
-        .from('payments')
+        .from('instructor_payments')
         .select('*')
         .eq('instructor_id', user.id)
         .order('created_at', ascending: false);
@@ -112,6 +119,7 @@ final instructorPaymentsProvider = FutureProvider<List<Map<String, dynamic>>>((r
 
 // Provider for instructor's invoices
 final instructorInvoicesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -130,6 +138,7 @@ final instructorInvoicesProvider = FutureProvider<List<Map<String, dynamic>>>((r
 
 // Provider for instructor's messages
 final instructorMessagesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -148,6 +157,7 @@ final instructorMessagesProvider = FutureProvider<List<Map<String, dynamic>>>((r
 
 // Provider for instructor's notifications
 final instructorNotificationsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -166,6 +176,7 @@ final instructorNotificationsProvider = FutureProvider<List<Map<String, dynamic>
 
 // Provider for instructor's vehicles
 final instructorVehiclesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -184,6 +195,7 @@ final instructorVehiclesProvider = FutureProvider<List<Map<String, dynamic>>>((r
 
 // Provider for instructor's calendar events
 final instructorCalendarEventsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -202,6 +214,7 @@ final instructorCalendarEventsProvider = FutureProvider<List<Map<String, dynamic
 
 // Provider for instructor's teaching resources
 final instructorTeachingResourcesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -220,6 +233,7 @@ final instructorTeachingResourcesProvider = FutureProvider<List<Map<String, dyna
 
 // Provider for instructor's test reports
 final instructorTestReportsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -238,6 +252,7 @@ final instructorTestReportsProvider = FutureProvider<List<Map<String, dynamic>>>
 
 // Provider for instructor's mileage entries
 final instructorMileageProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
@@ -256,6 +271,7 @@ final instructorMileageProvider = FutureProvider<List<Map<String, dynamic>>>((re
 
 // Provider for banners (public)
 final bannersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
   try {
     final response = await Supabase.instance.client
         .from('banners')

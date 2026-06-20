@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'lesson_detail_sheet.dart';
@@ -759,17 +756,5 @@ class _WeekGridView extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _formatTime(String timeStr) {
-    try {
-      final parts = timeStr.split(':');
-      final h = int.parse(parts[0]);
-      final m = int.parse(parts[1]);
-      final dt = DateTime(2020, 1, 1, h, m);
-      return DateFormat('h:mm a').format(dt);
-    } catch (_) {
-      return timeStr;
-    }
   }
 }

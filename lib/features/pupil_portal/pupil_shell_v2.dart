@@ -135,14 +135,15 @@ class _GlassBottomNav extends StatelessWidget {
                 children: List.generate(tabs.length, (i) {
                   final t = tabs[i];
                   final sel = selectedIndex == i;
-                  return GestureDetector(
+                  return Expanded(
+                    child: GestureDetector(
                     onTap: () => onTap(i),
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 280),
                       curve: Curves.easeOutCubic,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: sel ? 16 : 12,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
@@ -164,6 +165,8 @@ class _GlassBottomNav extends StatelessWidget {
                           const SizedBox(height: 3),
                           Text(
                             t.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
@@ -174,6 +177,7 @@ class _GlassBottomNav extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   );
                 }),
@@ -207,9 +211,10 @@ class _QuickActionsSheet extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             const SizedBox(height: 12),
             Container(
               width: 36,
@@ -235,25 +240,29 @@ class _QuickActionsSheet extends StatelessWidget {
                     child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : Colors.black87,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'What would you like to do?',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500,
+                        Text(
+                          'What would you like to do?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -294,6 +303,7 @@ class _QuickActionsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
+        ),
         ),
       ),
     );

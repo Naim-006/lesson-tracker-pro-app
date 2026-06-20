@@ -8,6 +8,7 @@ import 'dart:async';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
 import '../shell/app_shell.dart';
+import 'subscription_intro_screen.dart';
 
 class InstructorAuthScreen extends StatefulWidget {
   const InstructorAuthScreen({super.key});
@@ -36,8 +37,6 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
   final _localAuth = LocalAuthentication();
   bool _biometricAvailable = false;
   bool _hasSavedCredentials = false;
-  bool _emailNotConfirmed = false;
-  DateTime? _lastResendTime;
 
   @override
   void initState() {
@@ -101,7 +100,7 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
     }
     if (!skipValidation && !_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; _emailNotConfirmed = false; });
+    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; });
 
     try {
       if (_isLogin) {
@@ -110,18 +109,10 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
         await _signup();
       }
     } on AppAuthException catch (e) {
-      if (e.code == 'email_unconfirmed') {
-        setState(() { _errorMessage = e.message; _emailNotConfirmed = true; });
-      } else {
-        setState(() => _errorMessage = e.message);
-      }
+      setState(() => _errorMessage = e.message);
     } catch (e) {
       final err = AppAuthException.fromSupabase(e);
-      if (err.code == 'email_unconfirmed') {
-        setState(() { _errorMessage = err.message; _emailNotConfirmed = true; });
-      } else {
-        setState(() => _errorMessage = err.message);
-      }
+      setState(() => _errorMessage = err.message);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -146,18 +137,13 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
 
     final profileResponse = await Supabase.instance.client
         .from('profiles')
-        .select('role, email_verified')
+        .select('role')
         .eq('id', response.user!.id)
         .single();
 
     if (profileResponse['role'] != 'instructor') {
       await Supabase.instance.client.auth.signOut();
       throw AppAuthException('wrong_role', 'This account is not registered as an instructor. Please sign up as an instructor.');
-    }
-
-    if (profileResponse['email_verified'] != true) {
-      await Supabase.instance.client.auth.signOut();
-      throw const AppAuthException('email_unconfirmed', 'Please verify your email before logging in.');
     }
 
     if (_saveLogin) {
@@ -169,18 +155,32 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
     }
 
     if (mounted) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AppShell()));
+      final hasSubscription = await _checkSubscription(response.user!.id);
+      if (!mounted) return;
+      if (hasSubscription) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AppShell()));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SubscriptionIntroScreen()));
+      }
+    }
+  }
+
+  Future<bool> _checkSubscription(String userId) async {
+    try {
+      final sub = await Supabase.instance.client
+          .from('instructor_subscriptions')
+          .select('id')
+          .eq('instructor_id', userId)
+          .maybeSingle();
+      return sub != null;
+    } catch (_) {
+      return false;
     }
   }
 
   Future<void> _signup() async {
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
-
-    final exists = await checkEmailExists(email);
-    if (exists) {
-      throw const AppAuthException('email_exists', 'An account with this email already exists. Try logging in instead.');
-    }
 
     final phoneCheck = await Supabase.instance.client
         .from('profiles')
@@ -244,38 +244,6 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
       } else {
         setState(() => _errorMessage = err.message);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _resendVerification() async {
-    if (_lastResendTime != null && DateTime.now().difference(_lastResendTime!).inSeconds < 60) {
-      final remaining = 60 - DateTime.now().difference(_lastResendTime!).inSeconds;
-      setState(() => _errorMessage = 'Please wait $remaining seconds before requesting another email.');
-      return;
-    }
-
-    setState(() { _isLoading = true; _errorMessage = null; _successMessage = null; });
-
-    try {
-      await Supabase.instance.client.auth.resend(
-        type: OtpType.signup,
-        email: _emailController.text.trim(),
-      );
-      _lastResendTime = DateTime.now();
-      if (mounted) {
-        setState(() {
-          _successMessage = 'A new verification email has been sent to ${_emailController.text}. Check your inbox (and spam folder).';
-        });
-      }
-    } on AppAuthException catch (e) {
-      setState(() => _errorMessage = e.message);
-    } catch (e) {
-      final err = AppAuthException.fromSupabase(e);
-      setState(() => _errorMessage = err.code == 'send_failed'
-          ? 'Failed to send the verification email. Please try again later.'
-          : err.message);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -546,7 +514,7 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
             children: [
               Text(_isLogin ? "Don't have an account? " : 'Already have an account? ', style: GoogleFonts.poppins(color: Colors.grey[600])),
               TextButton(
-                onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; _successMessage = null; _emailNotConfirmed = false; }),
+                onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; _successMessage = null; }),
                 child: Text(_isLogin ? 'Sign Up' : 'Login', style: GoogleFonts.poppins(color: AppColors.sunsetBright, fontWeight: FontWeight.w600)),
               ),
             ],

@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -344,7 +342,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                     title: const Text('All day', style: TextStyle(fontWeight: FontWeight.w700)),
                     value: _allDay,
                     onChanged: (v) => setState(() => _allDay = v),
-                    activeColor: AppColors.sunsetBright,
+                    activeThumbColor: AppColors.sunsetBright,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -505,7 +503,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
               subtitle: const Text('Export event to external calendar', style: TextStyle(fontSize: 12)),
               value: _syncExternal,
               onChanged: (v) => setState(() => _syncExternal = v),
-              activeColor: AppColors.sunsetBright,
+              activeThumbColor: AppColors.sunsetBright,
             ),
           ),
           const SizedBox(height: 32),

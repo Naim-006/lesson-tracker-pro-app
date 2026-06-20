@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
 class PupilResourcesScreen extends ConsumerStatefulWidget {
@@ -145,16 +144,17 @@ class _PupilResourcesScreenState extends ConsumerState<PupilResourcesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Resource'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(
               controller: titleController,
               decoration: const InputDecoration(labelText: 'Resource Title'),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: selectedCollection,
+              initialValue: selectedCollection,
               decoration: const InputDecoration(labelText: 'Collection'),
               items: const ['Lesson Plans', 'Handouts', 'Videos', 'Practice Tests']
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -168,6 +168,7 @@ class _PupilResourcesScreenState extends ConsumerState<PupilResourcesScreen> {
               maxLines: 2,
             ),
           ],
+        ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

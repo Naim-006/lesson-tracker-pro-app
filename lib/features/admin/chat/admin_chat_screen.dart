@@ -56,7 +56,7 @@ class _AdminChatScreenState extends ConsumerState<AdminChatScreen> {
           .select('id, full_name, email')
           .inFilter('id', partnerIds.toList());
 
-      final profiles = profilesResponse as List<Map<String, dynamic>>;
+      final profiles = profilesResponse;
 
       // Get last message time for each conversation
       final conversations = <Map<String, dynamic>>[];

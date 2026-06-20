@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -242,7 +241,7 @@ class _RiskItemTile extends StatelessWidget {
         subtitle: Text(item.description, style: const TextStyle(fontSize: 13, color: Colors.grey)),
         value: item.completed,
         onChanged: onChanged,
-        activeColor: AppColors.sunsetBright,
+        activeThumbColor: AppColors.sunsetBright,
       ),
     );
   }

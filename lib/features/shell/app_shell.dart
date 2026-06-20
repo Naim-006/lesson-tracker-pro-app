@@ -343,18 +343,20 @@ class _FloatingNavBar extends StatelessWidget {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(tabs.length, (index) {
                   final isSelected = selectedIndex == index;
                   final tab = tabs[index];
-                  return _NavBarItem(
-                    icon: isSelected ? tab.active : tab.icon,
-                    label: tab.label,
-                    isSelected: isSelected,
-                    isDark: isDark,
-                    onTap: () => onTap(index),
+                  return Expanded(
+                    child: _NavBarItem(
+                      icon: isSelected ? tab.active : tab.icon,
+                      label: tab.label,
+                      isSelected: isSelected,
+                      isDark: isDark,
+                      onTap: () => onTap(index),
+                    ),
                   );
                 }),
               ),
@@ -392,8 +394,8 @@ class _NavBarItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 14 : 10,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
           vertical: 6,
         ),
         decoration: BoxDecoration(
@@ -427,6 +429,8 @@ class _NavBarItem extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

@@ -5,11 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/logger.dart';
-import '../../core/widgets/api_error_modal.dart';
 import '../../core/utils/error_handler.dart';
 import 'expense_category_picker_screen.dart';
 
@@ -67,7 +65,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     );
 
     if (source != null) {
-      final image = await _picker.pickImage(source: source!);
+      final image = await _picker.pickImage(source: source);
       if (image != null) {
         setState(() => _receiptPath = image.path);
       }
@@ -79,9 +77,10 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Enter Amount'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Text(
               _amount.text.isEmpty ? '£0.00' : '£${_amount.text}',
               style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
@@ -127,6 +126,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -156,19 +156,6 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       case PaymentMethod.card: return 'card';
       case PaymentMethod.cheque: return 'cheque';
       default: return 'bank_transfer';
-    }
-  }
-
-  String _mapExpenseCategory(ExpenseCategory category) {
-    switch (category) {
-      case ExpenseCategory.fuel: return 'fuel';
-      case ExpenseCategory.maintenance: return 'maintenance';
-      case ExpenseCategory.insurance: return 'insurance';
-      case ExpenseCategory.lease: return 'lease';
-      case ExpenseCategory.advertising: return 'advertising';
-      case ExpenseCategory.training: return 'training';
-      case ExpenseCategory.other: return 'other';
-      default: return 'other';
     }
   }
 
@@ -467,14 +454,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                       title: const Text('Recurring Expense', style: TextStyle(fontWeight: FontWeight.w700)),
                       value: _recurring,
                       onChanged: (v) => setState(() => _recurring = v),
-                      activeColor: AppColors.sunsetBright,
+                      activeThumbColor: AppColors.sunsetBright,
                     ),
                   ),
                   if (_recurring)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: DropdownButtonFormField<String>(
-                        value: _recurrencePattern,
+                        initialValue: _recurrencePattern,
                         decoration: InputDecoration(
                           labelText: 'Frequency',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

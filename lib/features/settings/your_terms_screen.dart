@@ -67,7 +67,7 @@ class _YourTermsScreenState extends ConsumerState<YourTermsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButtonFormField<int>(
-                    value: settings.cancellationPeriod,
+                    initialValue: settings.cancellationPeriod,
                     decoration: InputDecoration(
                       labelText: 'Minimum notice required',
                       border: InputBorder.none,
@@ -135,7 +135,7 @@ class _YourTermsScreenState extends ConsumerState<YourTermsScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     maxLines: 6,
-                    controller: TextEditingController(text: settings.termsAndConditions ?? ''),
+                    controller: TextEditingController(text: settings.termsAndConditions),
                     onChanged: (v) {
                       ref.read(settingsProvider.notifier).update(settings.copyWith(termsAndConditions: v));
                     },
@@ -161,13 +161,13 @@ class _YourTermsScreenState extends ConsumerState<YourTermsScreen> {
           // View Terms Button
           FilledButton.icon(
             onPressed: () {
-              if (settings.termsAndConditions != null && settings.termsAndConditions!.isNotEmpty) {
+              if (settings.termsAndConditions.isNotEmpty) {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Terms & Conditions'),
                     content: SingleChildScrollView(
-                      child: Text(settings.termsAndConditions!),
+                      child: Text(settings.termsAndConditions),
                     ),
                     actions: [
                       TextButton(

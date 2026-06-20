@@ -29,7 +29,7 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
           .order('price', ascending: true);
 
       setState(() {
-        _plans = response as List<Map<String, dynamic>>;
+        _plans = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -67,12 +67,14 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
                         ),
                       ),
                       const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () => _showCreatePlanDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Create Plan'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.sunset,
+                      Flexible(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showCreatePlanDialog(),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Create Plan', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.sunset,
+                          ),
                         ),
                       ),
                     ],
@@ -328,6 +330,8 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
             ),
             FilledButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 try {
                   await Supabase.instance.client.from('subscription_plans').insert({
                     'name': nameController.text.trim(),
@@ -338,16 +342,14 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
                     'is_active': isActive,
                     'created_at': DateTime.now().toIso8601String(),
                   });
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _loadPlans();
-                  }
+                  if (!mounted) return;
+                  navigator.pop();
+                  _loadPlans();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error creating plan: $e')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error creating plan: $e')),
+                  );
                 }
               },
               child: const Text('Create'),
@@ -433,6 +435,8 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
             ),
             FilledButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 try {
                   await Supabase.instance.client.from('subscription_plans').update({
                     'name': nameController.text.trim(),
@@ -442,16 +446,14 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
                     'is_free_tier': isFreeTier,
                     'is_active': isActive,
                   }).eq('id', plan['id']);
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _loadPlans();
-                  }
+                  if (!mounted) return;
+                  navigator.pop();
+                  _loadPlans();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error updating plan: $e')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error updating plan: $e')),
+                  );
                 }
               },
               child: const Text('Save'),

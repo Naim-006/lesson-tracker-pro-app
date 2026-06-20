@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -339,7 +338,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                     title: const Text('Generate Multiple Slots', style: TextStyle(fontWeight: FontWeight.w700)),
                     value: _multiSlot,
                     onChanged: (v) => setState(() => _multiSlot = v),
-                    activeColor: AppColors.sunsetBright,
+                    activeThumbColor: AppColors.sunsetBright,
                   ),
                   if (_multiSlot)
                     Padding(
@@ -354,7 +353,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: DropdownButtonFormField<String>(
-                                value: _frequency,
+                                initialValue: _frequency,
                                 decoration: InputDecoration(
                                   labelText: 'Frequency',
                                   border: InputBorder.none,
@@ -425,7 +424,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<String>(
-                      value: _groupFilter,
+                      initialValue: _groupFilter,
                       decoration: InputDecoration(
                         labelText: 'Who can see this slot?',
                         border: InputBorder.none,
@@ -478,7 +477,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<String>(
-                      value: _groupFilter,
+                      initialValue: _groupFilter,
                       decoration: InputDecoration(
                         labelText: 'Group',
                         border: InputBorder.none,
@@ -495,7 +494,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<String>(
-                      value: _gearboxFilter,
+                      initialValue: _gearboxFilter,
                       decoration: InputDecoration(
                         labelText: 'Gearbox Filter',
                         border: InputBorder.none,
@@ -627,7 +626,7 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                       subtitle: const Text('Pupils must pay to confirm booking', style: TextStyle(fontSize: 12)),
                       value: _requireOnlinePay,
                       onChanged: (v) => setState(() => _requireOnlinePay = v),
-                      activeColor: AppColors.sunsetBright,
+                      activeThumbColor: AppColors.sunsetBright,
                     ),
                   ),
                 ],

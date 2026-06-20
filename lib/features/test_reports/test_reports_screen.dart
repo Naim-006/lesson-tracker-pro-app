@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'test_report_form_screen.dart';
@@ -281,7 +279,7 @@ class _TestReportsScreenState extends ConsumerState<TestReportsScreen> {
                     Switch(
                       value: _dvsaSyncEnabled,
                       onChanged: (v) => setState(() => _dvsaSyncEnabled = v),
-                      activeColor: AppColors.sunsetBright,
+                      activeThumbColor: AppColors.sunsetBright,
                     ),
                   ],
                 ),
@@ -368,10 +366,11 @@ class _TestReportsScreenState extends ConsumerState<TestReportsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(pupilName),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text('Grade: ${r['grade_level'] ?? 'N/A'}'),
             const SizedBox(height: 8),
             Text('Result: ${r['result']?.toUpperCase() ?? 'N/A'}'),
@@ -383,6 +382,7 @@ class _TestReportsScreenState extends ConsumerState<TestReportsScreen> {
               Text(r['notes'].toString()),
             ],
           ],
+        ),
         ),
         actions: [
           TextButton(
@@ -549,18 +549,21 @@ class _StudentPerformanceCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: resultColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      report['result']?.toUpperCase() ?? 'N/A',
-                      style: TextStyle(
-                        color: resultColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: resultColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        report['result']?.toUpperCase() ?? 'N/A',
+                        style: TextStyle(
+                          color: resultColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),

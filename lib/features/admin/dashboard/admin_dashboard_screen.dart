@@ -7,15 +7,25 @@ import '../../../core/theme/app_colors.dart';
 class _ActivityItem {
   final String title;
   final String description;
-  final String time;
+  final DateTime timestamp;
   final IconData icon;
 
   _ActivityItem({
     required this.title,
     required this.description,
-    required this.time,
+    required this.timestamp,
     required this.icon,
   });
+
+  String get time => _formatTimeAgo(timestamp);
+
+  static String _formatTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inDays > 0) return '${difference.inDays}d ago';
+    if (difference.inHours > 0) return '${difference.inHours}h ago';
+    if (difference.inMinutes > 0) return '${difference.inMinutes}m ago';
+    return 'Just now';
+  }
 }
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -111,7 +121,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       activities.add(_ActivityItem(
         title: 'New Instructor Registration',
         description: '${instructor['full_name'] ?? 'Unknown'} registered as instructor',
-        time: _formatTimeAgo(DateTime.parse(instructor['created_at'])),
+        timestamp: DateTime.parse(instructor['created_at']),
         icon: Icons.person_add,
       ));
     }
@@ -129,7 +139,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       activities.add(_ActivityItem(
         title: 'New Subscription',
         description: '$name started a subscription',
-        time: _formatTimeAgo(DateTime.parse(sub['start_date'])),
+        timestamp: DateTime.parse(sub['start_date']),
         icon: Icons.subscriptions,
       ));
     }
@@ -148,36 +158,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       activities.add(_ActivityItem(
         title: 'Payment Received',
         description: '\$$amount payment from $name',
-        time: _formatTimeAgo(DateTime.parse(payment['payment_date'])),
+        timestamp: DateTime.parse(payment['payment_date']),
         icon: Icons.payment,
       ));
     }
 
-    // Sort all activities by time (most recent first), take top 5
-    activities.sort((a, b) {
-      // Simple heuristic: earlier items are more recent from individual queries
-      // We'll rely on the order within each group
-      return 0;
-    });
-
-    // Return top 5 most recent across all types
-    if (activities.length > 5) {
-      return activities.sublist(0, 5);
-    }
-    return activities;
-  }
-
-  String _formatTimeAgo(DateTime dateTime) {
-    final difference = DateTime.now().difference(dateTime);
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
+    activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return activities.take(5).toList();
   }
 
   @override

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -13,8 +12,6 @@ class LessonLengthsScreen extends ConsumerStatefulWidget {
 }
 
 class _LessonLengthsScreenState extends ConsumerState<LessonLengthsScreen> {
-  final List<int> _customLengths = [];
-
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
@@ -70,7 +67,7 @@ class _LessonLengthsScreenState extends ConsumerState<LessonLengthsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButtonFormField<int>(
-                    value: settings.defaultLessonDuration,
+                    initialValue: settings.defaultLessonDuration,
                     decoration: InputDecoration(
                       labelText: 'Default lesson length',
                       border: InputBorder.none,
@@ -213,7 +210,7 @@ class _LengthTile extends StatelessWidget {
               Switch(
                 value: enabled,
                 onChanged: (_) => onTap(),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
             ],
           ),

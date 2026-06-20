@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -150,7 +149,7 @@ class _DayCard extends StatelessWidget {
                 Switch(
                   value: isWorking,
                   onChanged: onToggle,
-                  activeColor: AppColors.sunsetBright,
+                  activeThumbColor: AppColors.sunsetBright,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

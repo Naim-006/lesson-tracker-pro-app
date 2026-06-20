@@ -52,7 +52,7 @@ export default function HomePage() {
           <p className="text-sm text-gray-500 mb-6">
             Download the app and ask your instructor for an invite link.
           </p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex gap-3 justify-center flex-wrap">
             <div className="px-5 py-3 bg-gray-900 text-white rounded-xl text-sm font-semibold flex items-center gap-2">
               <span>📱</span> Download App
             </div>
@@ -63,6 +63,12 @@ export default function HomePage() {
               className="px-5 py-3 bg-green-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2"
             >
               <span>💬</span> Contact Us
+            </a>
+            <a
+              href="/help"
+              className="px-5 py-3 bg-white text-gray-900 rounded-xl text-sm font-semibold flex items-center gap-2 border border-gray-200 hover:bg-gray-50"
+            >
+              <span>❓</span> Help
             </a>
           </div>
         </div>

@@ -49,13 +49,11 @@ class _LoadingShimmerState extends State<LoadingShimmer> with SingleTickerProvid
           itemBuilder: (context, index) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
+              child: _ShimmerItem(
+                baseColor: baseColor,
+                highlightColor: highlightColor,
+                animation: _controller,
                 height: widget.itemHeight,
-                decoration: BoxDecoration(
-                  color: baseColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: _buildShimmerItem(baseColor, highlightColor),
               ),
             );
           },
@@ -63,47 +61,94 @@ class _LoadingShimmerState extends State<LoadingShimmer> with SingleTickerProvid
       },
     );
   }
+}
 
-  Widget _buildShimmerItem(Color base, Color highlight) {
-    return Row(
-      children: [
-        const SizedBox(width: 16),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: base,
-            borderRadius: BorderRadius.circular(14),
+class _ShimmerItem extends StatelessWidget {
+  final Color baseColor;
+  final Color highlightColor;
+  final Animation<double> animation;
+  final double height;
+
+  const _ShimmerItem({
+    required this.baseColor,
+    required this.highlightColor,
+    required this.animation,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              colors: [baseColor, highlightColor, baseColor],
+              stops: const [0.0, 0.5, 1.0],
+              begin: Alignment(-1.0 + animation.value * 2, 0.0),
+              end: Alignment(1.0 + animation.value * 2, 0.0),
+            ).createShader(bounds);
+          },
+          blendMode: BlendMode.srcOver,
+          child: Container(
+            height: height,
+            decoration: BoxDecoration(
+              color: baseColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 140,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 200,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  width: 60,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 140,
-                height: 14,
-                decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(4)),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: 200,
-                height: 12,
-                decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(4)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Container(
-          width: 60,
-          height: 24,
-          decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(8)),
-        ),
-        const SizedBox(width: 16),
-      ],
+        );
+      },
     );
   }
 }

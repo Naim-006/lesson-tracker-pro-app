@@ -29,7 +29,7 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
           .order('created_at', ascending: false);
 
       setState(() {
-        _promoCodes = response as List<Map<String, dynamic>>;
+        _promoCodes = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -136,18 +136,22 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.sunset.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  code ?? 'N/A',
-                  style: const TextStyle(
-                    color: AppColors.sunset,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.sunset.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    code ?? 'N/A',
+                    style: const TextStyle(
+                      color: AppColors.sunset,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ),
@@ -487,6 +491,8 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
                   ? null
                   : () async {
                       setDialogState(() => isSaving = true);
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(context);
                       try {
                                         final validUntilStr = selectedDate?.toIso8601String().split('T').first;
                           final data = <String, dynamic>{
@@ -506,23 +512,19 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
                             'is_active': true,
                             'used_count': 0,
                           };
-                          final nav = Navigator.of(context);
                           await Supabase.instance.client
                               .from('promo_codes')
                               .insert(data);
                           nav.pop();
                           _loadPromoCodes();
                       } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Error creating promo code: $e')),
-                          );
-                        }
-                        if (mounted) {
-                          setDialogState(() => isSaving = false);
-                        }
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text('Error creating promo code: $e')),
+                        );
+                        setDialogState(() => isSaving = false);
                       }
                     },
               child: isSaving
@@ -683,6 +685,8 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
                   ? null
                   : () async {
                       setDialogState(() => isSaving = true);
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(context);
                       try {
                         final validUntilStr = selectedDate?.toIso8601String().split('T').first;
                         final data = <String, dynamic>{
@@ -702,7 +706,6 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
                                   : assignedUserController.text.trim(),
                           'valid_until': validUntilStr,
                         };
-                        final nav = Navigator.of(context);
                         await Supabase.instance.client
                             .from('promo_codes')
                             .update(data)
@@ -710,16 +713,13 @@ class _PromoCodesScreenState extends ConsumerState<PromoCodesScreen> {
                         nav.pop();
                         _loadPromoCodes();
                       } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Error updating promo code: $e')),
-                          );
-                        }
-                        if (mounted) {
-                          setDialogState(() => isSaving = false);
-                        }
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text('Error updating promo code: $e')),
+                        );
+                        setDialogState(() => isSaving = false);
                       }
                     },
               child: isSaving

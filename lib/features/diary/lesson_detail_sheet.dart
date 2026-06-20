@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../finances/payment_form_screen.dart';
@@ -82,6 +81,7 @@ class LessonDetailSheet extends ConsumerWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -252,6 +252,7 @@ class LessonDetailSheet extends ConsumerWidget {
               child: const Text('Delete'),
             ),
           ],
+        ),
         ),
       ),
     );

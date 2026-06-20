@@ -92,51 +92,53 @@ class _PupilSettingsScreenState extends ConsumerState<PupilSettingsScreen> {
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Saved Payment Methods',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.sunsetBright.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.2)),
+              const SizedBox(height: 20),
+              const Text(
+                'Saved Payment Methods',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
-              child: Column(
-                children: [
-                  Icon(Icons.credit_card, size: 40, color: AppColors.sunsetBright),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'No cards saved yet',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Add a payment method to pay for lessons securely.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                  ),
-                ],
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.sunsetBright.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.credit_card, size: 40, color: AppColors.sunsetBright),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No cards saved yet',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add a payment method to pay for lessons securely.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -154,10 +156,11 @@ class _PupilSettingsScreenState extends ConsumerState<PupilSettingsScreen> {
           left: 24, right: 24, top: 12,
           bottom: MediaQuery.of(context).viewInsets.bottom + 32,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Center(
               child: Container(
                 width: 36, height: 4,
@@ -245,6 +248,7 @@ class _PupilSettingsScreenState extends ConsumerState<PupilSettingsScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

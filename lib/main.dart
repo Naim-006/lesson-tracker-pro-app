@@ -18,7 +18,7 @@ void main() async {
   // Initialize Supabase
   await Supabase.initialize(
     url: 'https://ssnbzixjzwiovelgezwd.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbmJ6aXhqendpb3ZlbGdlendkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTg1NDcsImV4cCI6MjA5NjgzNDU0N30.oQf7czBpeoBjcZ2_IqNDGidQ9hBjo3O2n8pLxGcWOQE',
+    publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbmJ6aXhqendpb3ZlbGdlendkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTg1NDcsImV4cCI6MjA5NjgzNDU0N30.oQf7czBpeoBjcZ2_IqNDGidQ9hBjo3O2n8pLxGcWOQE',
   );
   
   // Set up global error handling
@@ -77,6 +77,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   Future<void> _checkAuthAndOnboarding() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       _onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
       
       // Check if user is logged in
@@ -105,6 +106,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       setState(() {
         _isLoading = false;
       });
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
@@ -120,6 +122,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           .eq('id', currentUser.id)
           .single();
 
+      if (!mounted) return;
       final role = response['role'] as String?;
 
       if (role == 'admin') {
@@ -142,6 +145,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       }
     } catch (e) {
       Logger.error('Error fetching user role', error: e);
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );

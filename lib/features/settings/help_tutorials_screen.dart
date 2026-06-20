@@ -277,14 +277,14 @@ class _FAQTileState extends State<_FAQTile> {
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(widget.faq.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        onExpansionChanged: (v) => setState(() => _expanded = v),
+        trailing: Icon(_expanded ? Icons.expand_less : Icons.expand_more, color: AppColors.sunsetBright),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Text(widget.faq.answer, style: const TextStyle(fontSize: 14, color: Colors.grey)),
           ),
         ],
-        onExpansionChanged: (v) => setState(() => _expanded = v),
-        trailing: Icon(_expanded ? Icons.expand_less : Icons.expand_more, color: AppColors.sunsetBright),
       ),
     );
   }

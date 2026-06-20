@@ -27,87 +27,109 @@ This guide will help you set up Supabase for your Flutter app with authenticatio
 ## Step 3: Run Database Schema
 
 1. Go to the SQL Editor in Supabase Dashboard
-2. Open the file `SUPABASE_DATABASE_DESIGN.md` in your project
-3. Copy the entire SQL schema from that file
-4. Paste it into the SQL Editor
-5. Click "Run" to execute the schema
-6. Verify all tables were created successfully
+2. Open `SUPABASE_SCHEMA.sql` from the project root and copy the entire contents
+3. Paste it into the SQL Editor
+4. Click "Run" to execute the schema
+5. Verify all tables were created successfully by checking the "Tables" section
+
+> The schema includes everything: tables, enums, indexes, triggers, RLS policies (with `is_admin()` security definer function to avoid recursion), seed data, and the auth trigger that auto-creates a profile row on user signup.
 
 ## Step 4: Configure Flutter App
 
 1. Open `lib/main.dart`
-2. Replace the placeholder values:
+2. The Supabase URL and anon key are already configured:
    ```dart
    await Supabase.initialize(
-     url: 'YOUR_SUPABASE_URL',  // Replace with your Project URL
-     anonKey: 'YOUR_SUPABASE_ANON_KEY',  // Replace with your anon key
+     url: 'https://ssnbzixjzwiovelgezwd.supabase.co',
+     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
    );
    ```
+3. If you created a NEW Supabase project, replace these with your own credentials from Project Settings → API
 
 ## Step 5: Enable Email Authentication
 
 1. Go to Authentication → Providers in Supabase Dashboard
 2. Click on "Email"
-3. Ensure "Enable Email provider" is turned on
+3. Enable the provider
 4. Configure email settings:
-   - **Confirm email**: Enabled (recommended)
+   - **Confirm email**: Enabled (required)
    - **Secure email change**: Enabled
    - **Secure password reset**: Enabled
+5. **IMPORTANT**: SMTP must be configured for verification emails to send. Go to Authentication → Settings and set up a custom SMTP provider.
 
 ## Step 6: Test Authentication Flow
 
 1. Run your Flutter app
 2. You should see the onboarding screen
 3. Navigate through onboarding
-4. Select a role (Pupil or Instructor)
-5. Try signing up a new user
+4. Select "I'm an Instructor"
+5. Sign up with name, UK phone, email, password
 6. Check your email for verification link
 7. Verify the email
-8. Try logging in
+8. Log in — you'll be directed to subscription selection
+9. Select a plan or continue with free trial → enters Instructor Portal
 
-## Step 7: Test Pupil Portal
+## Step 8: Test Pupil Portal
 
-1. Sign up as a pupil
-2. Verify email
-3. Login as pupil
-4. You should see the pupil portal with:
-   - Home dashboard
-   - Progress tracking
-   - Enquiry system
-   - Nearby tutors
-   - Messaging
-   - Slot requests
-   - Payments
+1. As an instructor, add a pupil and send an invitation
+2. Sign up as a pupil using the invited email
+3. Verify email
+4. Login — pupil portal with home, journey, chat, menu
+5. Features: progress tracking, messaging, payments, slot requests
 
-## Step 8: Test Instructor Portal
+## Step 9: Test Admin Portal
 
-1. Sign up as an instructor
-2. Verify email
-3. Login as instructor
-4. You should see the instructor portal (uses local storage for now)
+1. Manually insert an admin profile in Supabase Table Editor:
+   ```sql
+   INSERT INTO profiles (id, full_name, email, role)
+   VALUES ('USER_UUID_FROM_AUTH', 'Admin Name', 'admin@email.com', 'admin');
+   ```
+2. Login with the admin account → Admin Shell with full dashboard
+3. Manage: instructors, subscriptions, plans, promo codes, payments, settings
 
 ## Troubleshooting
+
+### Infinite recursion in RLS policy (code 42P17)
+- Caused by the `admins_read_all_profiles` policy querying `profiles` itself.
+- **Fix**: The schema now defines a `public.is_admin()` SECURITY DEFINER function that bypasses RLS. If you have the old schema, run:
+  ```sql
+  CREATE OR REPLACE FUNCTION public.is_admin() RETURNS BOOLEAN
+  LANGUAGE sql SECURITY DEFINER STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  $$;
+  ALTER POLICY "admins_read_all_profiles" ON profiles USING (public.is_admin());
+  ```
+- Then update all other policies referencing `SELECT ... FROM profiles WHERE role = 'admin'` to use `public.is_admin()`.
+
+### Profile not created on signup
+- Check that the `on_auth_user_created` trigger exists in Triggers section
+- The trigger is included in `SUPABASE_SCHEMA.sql` Part 7 — re-run the full schema if missing
+- Manually insert a profile row if needed
 
 ### Email verification not working
 - Check if email provider is enabled in Supabase
 - Check spam folder
-- Ensure SMTP settings are configured in Supabase
+- Ensure SMTP settings are configured in Authentication → Settings
 
 ### Authentication errors
-- Verify URL and anon key are correct
+- Verify URL and anon key are correct in `lib/main.dart`
 - Check if user is email verified
-- Check RLS policies in database
+- Check RLS policies don't block access
 
 ### Data not loading
-- Verify database schema was executed
-- Check RLS policies allow access
-- Ensure user is authenticated
+- Verify database schema was executed (check tables exist)
+- Check RLS policies allow access (run as authenticated user)
+- Ensure user role in profiles table matches expected role
+
+### "No invitation" for pupil signup
+- Instructor must first invite the pupil via email in the Pupils section
+- The invitation must exist in `pupil_invitations` table with status `pending`
 
 ## Next Steps
 
 After successful setup:
-1. Customize the database schema if needed
-2. Add more RLS policies for additional security
-3. Configure email templates in Supabase
-4. Set up storage for file uploads (avatars, etc.)
-5. Consider migrating instructor portal data to Supabase (future enhancement)
+1. **Stripe Integration**: Install `flutter_stripe` package and implement payment intents
+2. **Push Notifications**: Set up Supabase Realtime or Firebase Cloud Messaging
+3. **File Storage**: Configure Supabase Storage buckets for avatars, receipts, resources
+4. **Custom Branding**: Set up email templates in Supabase
+5. **Data Migration**: Existing users' local data can be migrated via the export/import tools

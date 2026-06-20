@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -86,7 +85,6 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
     if (user == null) return;
 
     final finalPupilId = _pupil?.id ?? widget.existing!.pupilId;
-    final finalPupilName = _pupil?.fullName ?? widget.existing!.pupilName;
     final finalRate = _pupil != null ? _pupil!.hourlyRate : (widget.existing?.rate ?? 40.0) / ((widget.existing?.duration ?? 60) / 60);
 
     final lessonData = {
@@ -243,7 +241,7 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DropdownButtonFormField<LessonType>(
-                value: _type,
+                initialValue: _type,
                 decoration: InputDecoration(
                   labelText: 'Lesson Type',
                   border: InputBorder.none,
@@ -506,7 +504,7 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
                 title: const Text('Share with pupil', style: TextStyle(fontWeight: FontWeight.w700)),
                 value: _shared,
                 onChanged: (v) => setState(() => _shared = v),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
             ),
             const SizedBox(height: 24),
@@ -531,13 +529,13 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
                     title: const Text('Recurring Lesson', style: TextStyle(fontWeight: FontWeight.w700)),
                     value: _recurring,
                     onChanged: (v) => setState(() => _recurring = v),
-                    activeColor: AppColors.sunsetBright,
+                    activeThumbColor: AppColors.sunsetBright,
                   ),
                   if (_recurring)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: DropdownButtonFormField<String>(
-                        value: _recurrencePattern,
+                        initialValue: _recurrencePattern,
                         decoration: InputDecoration(
                           labelText: 'Pattern',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

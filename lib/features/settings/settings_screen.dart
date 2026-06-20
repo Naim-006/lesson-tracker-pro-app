@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
-import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 
 import '../../features/auth/role_selection_screen.dart';
@@ -217,7 +216,7 @@ class _BusinessTab extends StatelessWidget {
                 subtitle: const Text('Enable Lesson Tracker Payments'),
                 value: settings.acceptOnlinePayments,
                 onChanged: (v) => onSave(settings.copyWith(acceptOnlinePayments: v)),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
               const Divider(height: 1),
               ListTile(
@@ -330,7 +329,7 @@ class _BusinessTab extends StatelessWidget {
             subtitle: const Text('Display safety reminders to pupils'),
             value: settings.covidSafetyEnabled,
             onChanged: (v) => onSave(settings.copyWith(covidSafetyEnabled: v)),
-            activeColor: AppColors.sunsetBright,
+            activeThumbColor: AppColors.sunsetBright,
           ),
         ),
         const SizedBox(height: 24),
@@ -338,31 +337,6 @@ class _BusinessTab extends StatelessWidget {
     );
   }
 
-  void _showRateDialog(BuildContext context, AppSettings settings, Future<void> Function(AppSettings) onSave) {
-    final controller = TextEditingController(text: settings.hourlyRate.toStringAsFixed(2));
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set Hourly Rate'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Rate (£)', prefixIcon: Icon(Icons.currency_pound)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final rate = double.tryParse(controller.text) ?? settings.hourlyRate;
-              onSave(settings.copyWith(hourlyRate: rate));
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _TeachingTab extends StatelessWidget {
@@ -422,7 +396,7 @@ class _TeachingTab extends StatelessWidget {
                   subtitle: const Text('Track pupil skill development'),
                   value: settings.progressTrackingEnabled,
                   onChanged: (v) => onSave(settings.copyWith(progressTrackingEnabled: v)),
-                  activeColor: AppColors.sunsetBright,
+                  activeThumbColor: AppColors.sunsetBright,
                 ),
               ),
               const SizedBox(height: 16),
@@ -563,7 +537,7 @@ class _TeachingTab extends StatelessWidget {
                   subtitle: const Text('Import theory test results'),
                   value: settings.theoryTestSyncEnabled,
                   onChanged: (v) => onSave(settings.copyWith(theoryTestSyncEnabled: v)),
-                  activeColor: AppColors.sunsetBright,
+                  activeThumbColor: AppColors.sunsetBright,
                 ),
               ),
               const SizedBox(height: 16),
@@ -575,7 +549,7 @@ class _TeachingTab extends StatelessWidget {
                 child: ListTile(
                   title: const Text('Theory test provider', style: TextStyle(fontWeight: FontWeight.w700)),
                   trailing: DropdownButton<String>(
-                    value: settings.theoryTestProvider ?? 'DVSA',
+                    value: settings.theoryTestProvider,
                     items: const ['DVSA', 'Official DVSA', 'gov.uk', 'Other']
                         .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                         .toList(),
@@ -758,18 +732,6 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // Fetch data from Supabase providers
-                final pupils = await ref.read(instructorPupilsProvider.future);
-                final lessons = await ref.read(instructorLessonsProvider.future);
-                final payments = await ref.read(instructorPaymentsProvider.future);
-                
-                // Create a simplified app state for export
-                final exportData = {
-                  'pupils': pupils,
-                  'lessons': lessons,
-                  'payments': payments,
-                };
-                
                 if (context.mounted) {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportFormScreen()));
                 }
@@ -820,11 +782,6 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // Fetch data from Supabase providers
-                final pupils = await ref.read(instructorPupilsProvider.future);
-                final lessons = await ref.read(instructorLessonsProvider.future);
-                final payments = await ref.read(instructorPaymentsProvider.future);
-                
                 if (context.mounted) {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportFormScreen()));
                 }
@@ -949,7 +906,7 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
                 subtitle: const Text('Export lessons to Google/Apple calendar'),
                 value: settings.calendarSyncEnabled,
                 onChanged: (v) => onSave(settings.copyWith(calendarSyncEnabled: v)),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
               const Divider(height: 1),
               ListTile(
@@ -978,14 +935,14 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
                     onSave(settings.copyWith(notificationsEnabled: v));
                   }
                 },
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
               const Divider(height: 1),
               SwitchListTile(
                 title: const Text('Email notifications'),
                 value: settings.emailNotifications,
                 onChanged: (v) => onSave(settings.copyWith(emailNotifications: v)),
-                activeColor: AppColors.sunsetBright,
+                activeThumbColor: AppColors.sunsetBright,
               ),
               const Divider(height: 1),
               ListTile(

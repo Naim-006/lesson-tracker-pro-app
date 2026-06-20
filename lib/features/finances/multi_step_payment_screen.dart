@@ -619,7 +619,7 @@ class _AmountStep extends StatelessWidget {
                     Switch(
                       value: isPackage,
                       onChanged: onPackageToggle,
-                      activeColor: AppColors.sunsetBright,
+                      activeThumbColor: AppColors.sunsetBright,
                     ),
                   ],
                 ),

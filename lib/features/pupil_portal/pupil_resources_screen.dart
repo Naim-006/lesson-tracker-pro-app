@@ -49,7 +49,7 @@ class _PupilResourcesScreenState extends ConsumerState<PupilResourcesScreen> {
           .order('created_at', ascending: false);
 
       setState(() {
-        _resources = response as List<Map<String, dynamic>>;
+        _resources = response;
         _isLoading = false;
       });
     } catch (e) {

@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import '../services/supabase_sync_service.dart';
 
 final appStateProvider =
     StateNotifierProvider<AppStateNotifier, AppState>((ref) {
@@ -146,12 +148,67 @@ class AppStateNotifier extends StateNotifier<AppState> {
 
   static const _key = 'lesson_tracker_pro_v1';
   bool _loaded = false;
+  final _supabase = SupabaseSyncService();
 
   Future<void> _init() async {
-    await _load();
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      await _hydrateFromSupabase();
+    }
+    if (!_loaded) {
+      await _load();
+    }
     if (!_loaded && state.pupils.isEmpty) {
       _seedMockData();
     }
+  }
+
+  Future<void> _hydrateFromSupabase() async {
+    try {
+      final pupils = await _supabase.fetchPupils();
+      final lessons = await _supabase.fetchLessons();
+      final transactions = await _supabase.fetchTransactions();
+      final openSlots = await _supabase.fetchOpenSlots();
+      final enquiries = await _supabase.fetchEnquiries();
+      final messages = await _supabase.fetchMessages();
+
+      state = AppState(
+        pupils: pupils
+            .map((e) => Pupil.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+        lessons: lessons
+            .map((e) => Lesson.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+        transactions: transactions
+            .map((e) => Transaction.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+        openSlots: openSlots
+            .map((e) => OpenSlot.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+        enquiries: enquiries
+            .map((e) => Enquiry.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+        messages: messages
+            .map((e) => ChatMessage.fromJson(_snakeToCamelMap(e)))
+            .toList(),
+      );
+      _loaded = true;
+      _save();
+    } catch (_) {
+      // fall back to local storage
+    }
+  }
+
+  static Map<String, dynamic> _snakeToCamelMap(Map<String, dynamic> input) {
+    final result = <String, dynamic>{};
+    for (final entry in input.entries) {
+      final camelKey = entry.key.replaceAllMapped(
+        RegExp(r'_([a-z])'),
+        (match) => match.group(1)!.toUpperCase(),
+      );
+      result[camelKey] = entry.value;
+    }
+    return result;
   }
 
   Future<void> _load() async {
@@ -416,6 +473,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     _log('pupil_added', 'Pupil added', p.fullName);
     _notify('Pupil added', p.fullName);
     _save();
+    _supabase.syncPupil(p);
   }
 
   void updatePupil(Pupil p) {
@@ -423,15 +481,18 @@ class AppStateNotifier extends StateNotifier<AppState> {
       pupils: state.pupils.map((x) => x.id == p.id ? p : x).toList(),
     );
     _save();
+    _supabase.syncPupil(p);
   }
 
   void deletePupil(String id) {
-    final name = state.pupils.firstWhere((p) => p.id == id).fullName;
+    final pupil = state.pupils.firstWhere((p) => p.id == id);
+    final name = pupil.fullName;
     state = state.copyWith(
       pupils: state.pupils.where((p) => p.id != id).toList(),
     );
     _log('pupil_removed', 'Pupil removed', name);
     _save();
+    _supabase.syncPupil(pupil, isDelete: true);
   }
 
   // Lessons
@@ -440,6 +501,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     _log('lesson_booked', 'Lesson booked', '${l.pupilName} ${l.time}');
     _notify('Lesson booked', '${l.pupilName} · ${l.time}');
     _save();
+    _supabase.syncLesson(l);
   }
 
   void updateLesson(Lesson l) {
@@ -454,13 +516,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
       _log('payment_received', 'Lesson marked paid', l.pupilName);
     }
     _save();
+    _supabase.syncLesson(l);
   }
 
   void deleteLesson(String id) {
+    final lesson = state.lessons.firstWhere((l) => l.id == id);
     state = state.copyWith(
       lessons: state.lessons.where((l) => l.id != id).toList(),
     );
     _save();
+    _supabase.syncLesson(lesson, isDelete: true);
   }
 
   // Slots
@@ -468,13 +533,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(openSlots: [...state.openSlots, s]);
     _log('slot_created', 'Open slot', '${s.startTime} ${s.duration}min');
     _save();
+    _supabase.syncOpenSlot(s);
   }
 
   void deleteOpenSlot(String id) {
+    final slot = state.openSlots.firstWhere((s) => s.id == id);
     state = state.copyWith(
       openSlots: state.openSlots.where((s) => s.id != id).toList(),
     );
     _save();
+    _supabase.syncOpenSlot(slot, isDelete: true);
   }
 
   // Events
@@ -482,13 +550,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(events: [...state.events, e]);
     _log('event_created', 'Event', e.title);
     _save();
+    _supabase.syncEvent(e);
   }
 
   void deleteEvent(String id) {
+    final event = state.events.firstWhere((e) => e.id == id);
     state = state.copyWith(
       events: state.events.where((e) => e.id != id).toList(),
     );
     _save();
+    _supabase.syncEvent(event, isDelete: true);
   }
 
   // Transactions
@@ -502,12 +573,14 @@ class AppStateNotifier extends StateNotifier<AppState> {
       _notify('Expense recorded', t.description);
     }
     _save();
+    _supabase.syncTransaction(t);
   }
 
   // Messages
   void sendMessage(ChatMessage m) {
     state = state.copyWith(messages: [...state.messages, m]);
     _save();
+    _supabase.syncMessage(m);
   }
 
   void updateMessage(ChatMessage updated) {
@@ -517,6 +590,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
           .toList(),
     );
     _save();
+    _supabase.syncMessage(updated);
   }
 
   void toggleMessageLock(String id) {
@@ -526,6 +600,8 @@ class AppStateNotifier extends StateNotifier<AppState> {
           .toList(),
     );
     _save();
+    final msg = state.messages.firstWhere((m) => m.id == id);
+    _supabase.syncMessage(msg);
   }
 
   // Enquiries
@@ -533,6 +609,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(enquiries: [...state.enquiries, e]);
     _log('enquiry_new', 'New enquiry', e.name);
     _save();
+    _supabase.syncEnquiry(e);
   }
 
   void updateEnquiry(Enquiry e) {
@@ -540,13 +617,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
       enquiries: state.enquiries.map((x) => x.id == e.id ? e : x).toList(),
     );
     _save();
+    _supabase.syncEnquiry(e);
   }
 
   void deleteEnquiry(String id) {
+    final enquiry = state.enquiries.firstWhere((e) => e.id == id);
     state = state.copyWith(
       enquiries: state.enquiries.where((e) => e.id != id).toList(),
     );
     _save();
+    _supabase.syncEnquiry(enquiry, isDelete: true);
   }
 
   // Test reports
@@ -554,13 +634,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(testReports: [...state.testReports, r]);
     _log('test_report', 'Test report', r.pupilName);
     _save();
+    _supabase.syncTestReport(r);
   }
 
   void deleteTestReport(String id) {
+    final report = state.testReports.firstWhere((r) => r.id == id);
     state = state.copyWith(
       testReports: state.testReports.where((r) => r.id != id).toList(),
     );
     _save();
+    _supabase.syncTestReport(report, isDelete: true);
   }
 
   void updateTestReport(TestReport r) {
@@ -568,6 +651,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
       testReports: state.testReports.map((x) => x.id == r.id ? r : x).toList(),
     );
     _save();
+    _supabase.syncTestReport(r);
   }
 
   // Mileage
@@ -576,6 +660,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     _log('mileage', 'Mileage', '${m.miles} miles');
     _notify('Mileage logged', '${m.miles} miles');
     _save();
+    _supabase.syncMileage(m);
   }
 
   // Progress Categories
@@ -623,6 +708,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(invoices: [...state.invoices, i]);
     _log('invoice_created', 'Invoice created', i.pupilName);
     _save();
+    _supabase.syncInvoice(i);
   }
 
   void updateInvoice(RequestPaymentInvoice i) {
@@ -630,13 +716,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
       invoices: state.invoices.map((x) => x.id == i.id ? i : x).toList(),
     );
     _save();
+    _supabase.syncInvoice(i);
   }
 
   void deleteInvoice(String id) {
+    final invoice = state.invoices.firstWhere((i) => i.id == id);
     state = state.copyWith(
       invoices: state.invoices.where((i) => i.id != id).toList(),
     );
     _save();
+    _supabase.syncInvoice(invoice, isDelete: true);
   }
 
   // Vehicles
@@ -644,6 +733,7 @@ class AppStateNotifier extends StateNotifier<AppState> {
     state = state.copyWith(vehicles: [...state.vehicles, v]);
     _log('vehicle_added', 'Vehicle added', '${v.make} ${v.model}');
     _save();
+    _supabase.syncVehicle(v);
   }
 
   void updateVehicle(Vehicle v) {
@@ -651,13 +741,16 @@ class AppStateNotifier extends StateNotifier<AppState> {
       vehicles: state.vehicles.map((x) => x.id == v.id ? v : x).toList(),
     );
     _save();
+    _supabase.syncVehicle(v);
   }
 
   void deleteVehicle(String id) {
+    final vehicle = state.vehicles.firstWhere((v) => v.id == id);
     state = state.copyWith(
       vehicles: state.vehicles.where((v) => v.id != id).toList(),
     );
     _save();
+    _supabase.syncVehicle(vehicle, isDelete: true);
   }
 
   // Teaching Resources
@@ -697,6 +790,8 @@ class AppStateNotifier extends StateNotifier<AppState> {
     _save();
   }
 }
+
+final dataRefreshProvider = StateProvider<int>((ref) => 0);
 
 final unreadNotificationsCountProvider = Provider<int>((ref) {
   final list = ref.watch(appStateProvider).notifications;

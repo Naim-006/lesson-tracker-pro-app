@@ -144,6 +144,8 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -152,6 +154,8 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
                     fontSize: 13,
                     color: Colors.white.withValues(alpha: 0.7),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -288,9 +292,10 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('About Lesson Tracker'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -317,6 +322,7 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
             ),
           ],
         ),
+        ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
@@ -332,10 +338,9 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
 class _MenuItem {
   final IconData icon;
   final String label;
-  final Color? color;
   final VoidCallback onTap;
 
-  _MenuItem({required this.icon, required this.label, this.color, required this.onTap});
+  _MenuItem({required this.icon, required this.label, required this.onTap});
 }
 
 class _MenuTile extends StatelessWidget {
@@ -346,7 +351,7 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemColor = item.color ?? (isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black87);
+    final itemColor = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black87;
 
     return Material(
       color: Colors.transparent,
@@ -362,10 +367,10 @@ class _MenuTile extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: (item.color ?? AppColors.sunsetBright).withValues(alpha: 0.1),
+                      color: AppColors.sunsetBright.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(item.icon, size: 20, color: item.color ?? AppColors.sunsetBright),
+                    child: Icon(item.icon, size: 20, color: AppColors.sunsetBright),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

@@ -339,13 +339,17 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
   }
 
   Widget _buildFilterTabs(bool isDark) {
-    return Row(
-      children: [
-        _filterTab('all', 'All'),
-        _filterTab('pending', 'Pending', badge: _pendingCount),
-        _filterTab('approved', 'Approved'),
-        _filterTab('rejected', 'Rejected'),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _filterTab('all', 'All'),
+          _filterTab('pending', 'Pending', badge: _pendingCount),
+          _filterTab('approved', 'Approved'),
+          _filterTab('rejected', 'Rejected'),
+        ],
+      ),
     );
   }
 

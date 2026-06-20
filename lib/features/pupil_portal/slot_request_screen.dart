@@ -82,11 +82,13 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
         'status': 'scheduled',
       });
 
+      if (!mounted) return;
       _loadData();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Slot requested successfully')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to request slot: $e')),
       );

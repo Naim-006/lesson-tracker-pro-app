@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -149,6 +146,8 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                   'is_primary': isPrimary,
                 };
 
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(ctx);
                 try {
                   if (vehicle == null) {
                     await Supabase.instance.client.from('vehicles').insert(vehicleData);
@@ -158,16 +157,14 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                         .update(vehicleData)
                         .eq('id', vehicle['id']);
                   }
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ref.invalidate(instructorVehiclesProvider);
-                  }
+                  if (!mounted) return;
+                  navigator.pop();
+                  ref.invalidate(instructorVehiclesProvider);
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: ${e.toString()}')),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
+                  );
                 }
               },
               child: const Text('Save'),
@@ -188,18 +185,18 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(ctx);
               try {
                 await Supabase.instance.client.from('vehicles').delete().eq('id', id);
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ref.invalidate(instructorVehiclesProvider);
-                }
+                if (!mounted) return;
+                navigator.pop();
+                ref.invalidate(instructorVehiclesProvider);
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: ${e.toString()}')),
-                  );
-                }
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Error: ${e.toString()}')),
+                );
               }
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),

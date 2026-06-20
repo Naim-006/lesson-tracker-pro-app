@@ -45,7 +45,7 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
           .order('created_at', ascending: false);
 
       setState(() {
-        _enquiries = response as List<Map<String, dynamic>>;
+        _enquiries = response;
         _isLoading = false;
       });
     } catch (e) {
@@ -117,8 +117,6 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
     final createdAt = enquiry['created_at'] as String?;
     final enquiryId = enquiry['id'] as String?;
     final instructorName = enquiry['instructor_name'] as String?;
-    final instructorEmail = enquiry['instructor_email'] as String?;
-    final instructorPhone = enquiry['instructor_phone'] as String?;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -189,7 +187,7 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
               ),
             ],
           ),
-          if (instructorName != null && instructorName!.isNotEmpty) ...[
+          if (instructorName != null && instructorName.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -217,21 +215,29 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
             children: [
               Icon(Icons.school, size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 8),
-              Text(
-                'Experience: ${experienceLevel ?? 'N/A'}',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
+              Flexible(
+                child: Text(
+                  'Experience: ${experienceLevel ?? 'N/A'}',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
               const SizedBox(width: 16),
               Icon(Icons.settings, size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 8),
-              Text(
-                'Gearbox: ${gearboxPreference ?? 'N/A'}',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
+              Flexible(
+                child: Text(
+                  'Gearbox: ${gearboxPreference ?? 'N/A'}',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],
@@ -387,7 +393,7 @@ class _AdminEnquiriesScreenState extends ConsumerState<AdminEnquiriesScreen> {
 
     if (!mounted) return;
 
-    final instructorsList = instructors as List<Map<String, dynamic>>;
+    final instructorsList = instructors;
 
     showDialog(
       context: context,

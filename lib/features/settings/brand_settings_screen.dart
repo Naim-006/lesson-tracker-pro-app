@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -14,7 +13,7 @@ class BrandSettingsScreen extends ConsumerStatefulWidget {
 
 class _BrandSettingsScreenState extends ConsumerState<BrandSettingsScreen> {
   String _businessName = 'My Driving School';
-  String _logoUrl = '';
+  final String _logoUrl = '';
   String _primaryColor = '#FF6B35';
   String _secondaryColor = '#F7C59F';
   bool _customBranding = false;
@@ -88,7 +87,7 @@ class _BrandSettingsScreenState extends ConsumerState<BrandSettingsScreen> {
               subtitle: const Text('Use your own branding instead of Lesson Tracker Pro', style: TextStyle(fontSize: 13, color: Colors.grey)),
               value: _customBranding,
               onChanged: (v) => setState(() => _customBranding = v),
-              activeColor: AppColors.sunsetBright,
+              activeThumbColor: AppColors.sunsetBright,
             ),
           ),
           const SizedBox(height: 24),

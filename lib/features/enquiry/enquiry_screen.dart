@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/models/models.dart';
-import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import 'enquiry_form_screen.dart';
@@ -44,10 +42,6 @@ class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
     final pending = filteredList.where((e) => e['status'] == 'pending').toList();
     final others = filteredList.where((e) => e['status'] != 'pending').toList();
 
-    // Get instructor ID for public link
-    final settings = ref.watch(settingsProvider);
-    final instructorId = settings.instructorName.toLowerCase().replaceAll(' ', '-');
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Enquiry Manager'),
@@ -77,9 +71,13 @@ class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
                     children: [
                       const Icon(Icons.inbox, size: 16, color: AppColors.info),
                       const SizedBox(width: 6),
-                      Text(
-                        'INCOMING STUDENT LEAD QUEUE (${pending.length} PENDING)',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.info),
+                      Expanded(
+                        child: Text(
+                          'INCOMING LEADS (${pending.length} PENDING)',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.info),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -281,10 +279,11 @@ class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
       isScrollControlled: true,
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Text(_fullName(e), style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if ((e['phone'] as String? ?? '').isNotEmpty) Text(e['phone'] as String? ?? '', style: const TextStyle(color: Colors.grey)),
@@ -309,30 +308,34 @@ class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
                   )),
                   const SizedBox(width: 8),
                 ],
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    try {
-                      await Supabase.instance.client.from('enquiries').delete().eq('id', e['id']);
-                      if (mounted) {
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  child: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(ctx);
+                      try {
+                        await Supabase.instance.client.from('enquiries').delete().eq('id', e['id']);
+                        if (!mounted) return;
                         ref.invalidate(instructorEnquiriesProvider);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        navigator.pop();
+                        messenger.showSnackBar(
                           const SnackBar(content: Text('Enquiry deleted')),
                         );
-                      }
-                    } catch (error) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                      } catch (error) {
+                        if (!mounted) return;
+                        messenger.showSnackBar(
                           SnackBar(content: Text('Error: ${error.toString()}')),
                         );
                       }
-                    }
-                  },
+                    },
+                  ),
                 ),
               ],
             ),
           ],
+        ),
         ),
       ),
     );

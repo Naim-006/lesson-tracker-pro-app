@@ -42,7 +42,7 @@ class _InstructorsScreenState extends ConsumerState<InstructorsScreen> {
           .eq('role', 'instructor');
 
       setState(() {
-        _instructors = response as List<Map<String, dynamic>>;
+        _instructors = response;
         _isLoading = false;
       });
     } catch (e) {

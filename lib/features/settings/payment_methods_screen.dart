@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -110,9 +109,10 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Payment Method'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(
               controller: nameController,
               decoration: const InputDecoration(labelText: 'Method Name'),
@@ -124,6 +124,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
               maxLines: 3,
             ),
           ],
+        ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -275,7 +276,7 @@ class _PaymentMethodCard extends StatelessWidget {
                 Switch(
                   value: method.enabled,
                   onChanged: onToggle,
-                  activeColor: AppColors.sunsetBright,
+                  activeThumbColor: AppColors.sunsetBright,
                 ),
               ],
             ),

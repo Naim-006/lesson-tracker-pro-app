@@ -60,6 +60,7 @@ class _PupilEnquiryScreenState extends State<PupilEnquiryScreen> {
       });
 
       _messageController.clear();
+      if (!mounted) return;
       Navigator.pop(context);
       _loadEnquiries();
 
@@ -67,6 +68,7 @@ class _PupilEnquiryScreenState extends State<PupilEnquiryScreen> {
         SnackBar(content: Text('Enquiry sent to $instructorName')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send enquiry: $e')),
       );
@@ -355,18 +357,19 @@ class _NewEnquiryDialogState extends State<_NewEnquiryDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Send New Enquiry'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const Text('Select Instructor'),
             const SizedBox(height: 8),
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : DropdownButtonFormField<String>(
-                    value: _selectedInstructorId,
+                    initialValue: _selectedInstructorId,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       hintText: 'Choose an instructor',
@@ -407,7 +410,8 @@ class _NewEnquiryDialogState extends State<_NewEnquiryDialog> {
           ],
         ),
       ),
-      actions: [
+    ),
+    actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),

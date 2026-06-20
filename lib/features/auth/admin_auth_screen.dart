@@ -26,8 +26,6 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
   String? _errorMessage;
   String? _successMessage;
   final _secureStorage = const FlutterSecureStorage();
-  bool _hasSavedCredentials = false;
-
   @override
   void initState() {
     super.initState();
@@ -42,7 +40,6 @@ class _AdminAuthScreenState extends State<AdminAuthScreen> {
         setState(() {
           _emailController.text = email;
           _passwordController.text = password;
-          _hasSavedCredentials = true;
           _saveLogin = true;
         });
       }
