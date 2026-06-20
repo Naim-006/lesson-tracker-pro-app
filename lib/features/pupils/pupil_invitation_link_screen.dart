@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 
@@ -100,6 +101,12 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
+      final submission = await Supabase.instance.client
+          .from('pupil_invite_submissions')
+          .select('first_name, last_name, email, phone, instructor_id')
+          .eq('id', id)
+          .single();
+
       await Supabase.instance.client
           .from('pupil_invite_submissions')
           .update({
@@ -109,10 +116,37 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
           })
           .eq('id', id);
 
+      if (action == 'approve' && submission != null) {
+        final profileId = const Uuid().v4();
+
+        await Supabase.instance.client.from('profiles').insert({
+          'id': profileId,
+          'full_name': '${submission['first_name'] ?? ''} ${submission['last_name'] ?? ''}'.trim(),
+          'email': submission['email'] ?? '',
+          'phone': submission['phone'] ?? '',
+          'role': 'pupil',
+        });
+
+        await Supabase.instance.client.from('pupils').insert({
+          'id': profileId,
+          'instructor_id': submission['instructor_id'],
+          'first_name': submission['first_name'] ?? '',
+          'last_name': submission['last_name'] ?? '',
+          'email': submission['email'] ?? '',
+          'phone': submission['phone'] ?? '',
+        });
+
+        await Supabase.instance.client.from('instructor_pupil_links').insert({
+          'instructor_id': submission['instructor_id'],
+          'pupil_id': profileId,
+          'status': 'active',
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(action == 'approve' ? 'Approved! Pupil will be created.' : 'Rejected.'),
+            content: Text(action == 'approve' ? 'Approved! Pupil created successfully.' : 'Rejected.'),
             backgroundColor: action == 'approve' ? AppColors.success : AppColors.error,
           ),
         );

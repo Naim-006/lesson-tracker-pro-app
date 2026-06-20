@@ -27,12 +27,14 @@ This guide will help you set up Supabase for your Flutter app with authenticatio
 ## Step 3: Run Database Schema
 
 1. Go to the SQL Editor in Supabase Dashboard
-2. Open `SUPABASE_SCHEMA.sql` from the project root and copy the entire contents
+2. Open `SUPABASE_DEFINITIVE.sql` from the project root and copy the entire contents
 3. Paste it into the SQL Editor
 4. Click "Run" to execute the schema
-5. Verify all tables were created successfully by checking the "Tables" section
+5. Verify all 35 tables were created successfully by checking the "Tables" section
 
-> The schema includes everything: tables, enums, indexes, triggers, RLS policies (with `is_admin()` security definer function to avoid recursion), seed data, and the auth trigger that auto-creates a profile row on user signup.
+> The definitive schema (`SUPABASE_DEFINITIVE.sql`) is the single source of truth. It includes everything: 35 tables, all enums, indexes, triggers, RLS policies (with `is_admin()` security definer function to avoid recursion), seed data, and the auth trigger that auto-creates a profile row on user signup.
+> 
+> **NOTE:** If you have any existing SQL files (SUPABASE_SCHEMA.sql, SUPABASE_FINAL.sql, SUPABASE_FRESH.sql, SUPABASE_APP_MATCH.sql, etc.), they are obsolete. Only use `SUPABASE_DEFINITIVE.sql`.
 
 ## Step 4: Configure Flutter App
 
