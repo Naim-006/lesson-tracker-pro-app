@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { submitFormSchema } from '@/lib/validators';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    const zodResult = submitFormSchema.safeParse(body);
+    if (!zodResult.success) {
+      const firstErr = zodResult.error.errors[0];
+      return NextResponse.json(
+        { error: firstErr?.message || 'Validation failed' },
+        { status: 400 },
+      );
+    }
+
     const { link_token, first_name, last_name, email, phone, address, postcode,
       pickup_location, dropoff_location, preferred_days, preferred_times,
       learning_goals, experience_level, emergency_contact_name, emergency_contact_phone, notes
-    } = body;
-
-    if (!link_token || !first_name || !last_name || !email) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
-    }
+    } = zodResult.data;
 
     const supabase = getSupabaseAdmin();
 
@@ -76,8 +79,8 @@ export async function POST(req: NextRequest) {
         postcode: postcode?.trim() || null,
         pickup_location: pickup_location?.trim() || null,
         dropoff_location: dropoff_location?.trim() || null,
-        preferred_days: preferred_days?.length > 0 ? preferred_days : null,
-        preferred_times: preferred_times?.length > 0 ? preferred_times : null,
+        preferred_days: Array.isArray(preferred_days) && preferred_days.length > 0 ? preferred_days : null,
+        preferred_times: Array.isArray(preferred_times) && preferred_times.length > 0 ? preferred_times : null,
         learning_goals: learning_goals?.trim() || null,
         experience_level: experience_level || null,
         emergency_contact_name: emergency_contact_name?.trim() || null,

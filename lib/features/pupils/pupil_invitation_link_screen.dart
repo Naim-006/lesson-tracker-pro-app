@@ -127,7 +127,7 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     }
   }
 
-  String _getInviteUrl() => 'https://lessontracker.pro/i/$_linkToken';
+  String _getInviteUrl() => 'https://lessontrackerpro.vercel.app/i/$_linkToken';
 
   @override
   Widget build(BuildContext context) {
@@ -573,7 +573,7 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
   }
 
   void _showWebDashboard() {
-    final url = 'https://lessontracker.pro/dashboard';
+    final url = 'https://lessontrackerpro.vercel.app/dashboard';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

@@ -11,10 +11,10 @@ class SupabaseSyncService {
   String? get _userId => _client.auth.currentUser?.id;
 
   static String camelToSnake(String input) {
-    return input.replaceAllMapped(
-      RegExp(r'[A-Z]'),
-      (match) => '_${match.group(0)!.toLowerCase()}',
-    );
+    if (input.isEmpty) return input;
+    final exp = RegExp(r'(?<=[a-z0-9])[A-Z]|(?<=[A-Z])[A-Z](?=[a-z])');
+    final snake = input.replaceAllMapped(exp, (m) => '_${m.group(0)!}');
+    return snake.toLowerCase();
   }
 
   Map<String, dynamic> _toSupabase(Map<String, dynamic> json) {

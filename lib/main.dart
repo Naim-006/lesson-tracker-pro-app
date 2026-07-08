@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/env/env_config.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/logger.dart';
@@ -17,8 +18,8 @@ void main() async {
   
   // Initialize Supabase
   await Supabase.initialize(
-    url: 'https://ssnbzixjzwiovelgezwd.supabase.co',
-    publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzbmJ6aXhqendpb3ZlbGdlendkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTg1NDcsImV4cCI6MjA5NjgzNDU0N30.oQf7czBpeoBjcZ2_IqNDGidQ9hBjo3O2n8pLxGcWOQE',
+    url: EnvConfig.supabaseUrl,
+    publishableKey: EnvConfig.supabaseAnonKey,
   );
   
   // Set up global error handling

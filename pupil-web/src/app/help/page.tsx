@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import AppLogo from '@/components/AppLogo';
-import DeveloperFooter from '@/components/DeveloperFooter';
+import Link from 'next/link';
 
 const faqs = [
   {
@@ -14,12 +13,12 @@ const faqs = [
     a: 'Your instructor will review your registration as soon as they are available. You can check your status anytime using the link from your email.',
   },
   {
-    q: 'I didn\'t receive the invite email.',
+    q: "I didn't receive the invite email.",
     a: 'Check your spam or junk folder. If you still can\'t find it, ask your instructor to resend the invite or contact us for help.',
   },
   {
     q: 'How do I reset my password?',
-    a: 'Open the Lesson Tracker app, go to the login screen, and tap "Forgot Password". Enter your email address and we\'ll send you a reset link.',
+    a: 'Go to the login screen and click "Forgot password?". Enter your email address and we\'ll send you a reset link.',
   },
   {
     q: 'The app says my invite link has expired.',
@@ -35,83 +34,87 @@ export default function HelpPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="glass-card rounded-3xl p-6 md:p-8 animate-fade-in">
-          <AppLogo size="md" />
-
-          <div className="mt-6">
-            <h2 className="text-xl font-bold text-gray-900">Help & Support</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Find answers to common questions or get in touch with us.
-            </p>
-          </div>
-
-          {/* Quick Contact */}
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <a
-              href="https://wa.me/8801984862536"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center hover:bg-green-100 transition-colors"
-            >
-              <div className="text-2xl mb-1">💬</div>
-              <p className="text-sm font-semibold text-green-800">WhatsApp</p>
-              <p className="text-xs text-green-600 mt-0.5">Quick reply</p>
-            </a>
-            <a
-              href="tel:+8801984862536"
-              className="p-4 bg-sunset-50 rounded-2xl border border-sunset-200 text-center hover:bg-sunset-100 transition-colors"
-            >
-              <div className="text-2xl mb-1">📞</div>
-              <p className="text-sm font-semibold text-sunset-800">Call Us</p>
-              <p className="text-xs text-sunset-600 mt-0.5">+880 1984-862536</p>
-            </a>
-          </div>
-
-          {/* FAQ */}
-          <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Frequently Asked Questions</h3>
-            <div className="space-y-2">
-              {faqs.map((faq, i) => (
-                <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full px-4 py-3 text-left flex items-center justify-between gap-2 hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-sm font-medium text-gray-900">{faq.q}</span>
-                    <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
-                        openFaq === i ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {openFaq === i && (
-                    <div className="px-4 pb-3 animate-fade-in">
-                      <p className="text-sm text-gray-600 leading-relaxed">{faq.a}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Contact Form */}
-          <div className="mt-8 p-4 bg-gray-50 rounded-2xl border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Still Need Help?</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Fill in the form below and we&apos;ll get back to you.
-            </p>
-            <ContactForm />
+    <div className="auth-page py-12 items-start h-auto">
+      <div className="auth-card max-w-2xl w-full mx-auto" style={{padding: '2rem'}}>
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-[var(--border)]">
+          <Link href="/" className="w-10 h-10 bg-gradient-to-br from-[#f3751f] to-[#e05a0c] rounded-xl flex items-center justify-center shadow-[var(--shadow-sunset)] shrink-0 transition-transform hover:scale-105">
+            <span className="text-white font-black text-lg">L</span>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Help & Support</h1>
+            <p className="text-sm text-[var(--text-muted)]">Find answers or get in touch</p>
           </div>
         </div>
 
-        <DeveloperFooter />
+        {/* Quick Contact */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          <a
+            href="https://wa.me/8801984862536"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-5 bg-[#f0fdf4] rounded-2xl border border-[#bbf7d0] text-center hover:bg-[#dcfce7] transition-all hover:-translate-y-0.5"
+          >
+            <div className="text-3xl mb-2">💬</div>
+            <p className="text-[15px] font-bold text-[#166534]">WhatsApp</p>
+            <p className="text-xs text-[#15803d]">Instant reply</p>
+          </a>
+          <a
+            href="tel:+8801984862536"
+            className="p-5 bg-[var(--sunset-light)] rounded-2xl border border-[var(--sunset)] opacity-80 text-center hover:opacity-100 transition-all hover:-translate-y-0.5"
+          >
+            <div className="text-3xl mb-2">📞</div>
+            <p className="text-[15px] font-bold text-[var(--sunset-dark)]">Call Us</p>
+            <p className="text-xs text-[var(--sunset)]">+880 1984-862536</p>
+          </a>
+        </div>
+
+        {/* FAQ */}
+        <div className="mb-10">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">Frequently Asked Questions</h2>
+          <div className="space-y-3">
+            {faqs.map((faq, i) => (
+              <div key={i} className="bg-[var(--surface)] rounded-xl border border-[var(--border-strong)] overflow-hidden transition-all">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full px-5 py-4 text-left flex items-start justify-between gap-4 hover:bg-[var(--surface-2)] transition-colors focus:outline-none"
+                >
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">{faq.q}</span>
+                  <svg
+                    className={`w-5 h-5 text-[var(--text-muted)] transition-transform flex-shrink-0 mt-0.5 ${
+                      openFaq === i ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-4 pt-1 animate-fade-in-up">
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{faq.a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Contact Form */}
+        <div className="p-6 bg-[var(--surface-2)] rounded-2xl border border-[var(--border)]">
+          <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">Still Need Help?</h2>
+          <p className="text-sm text-[var(--text-muted)] mb-5">
+            Fill in the form below and we'll get back to you shortly.
+          </p>
+          <ContactForm />
+        </div>
+        
+        <div className="mt-8 text-center">
+          <Link href="/" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors font-medium">
+            ← Back to Home
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -151,54 +154,66 @@ function ContactForm() {
 
   if (submitted) {
     return (
-      <div className="text-center py-4">
-        <div className="text-3xl mb-2">📨</div>
-        <p className="text-sm font-medium text-gray-900">Message Sent!</p>
-        <p className="text-xs text-gray-500 mt-1">We&apos;ll get back to you as soon as possible.</p>
+      <div className="text-center py-6 bg-[var(--surface)] rounded-xl border border-[#bbf7d0]">
+        <div className="text-4xl mb-3">📨</div>
+        <p className="text-base font-bold text-[#166534]">Message Sent successfully!</p>
+        <p className="text-sm text-[#15803d] mt-1 px-4">We'll get back to you at {form.email} as soon as possible.</p>
+        <button 
+          onClick={() => { setForm({ name: '', email: '', message: '' }); setSubmitted(false); }}
+          className="mt-4 text-sm font-semibold text-[var(--sunset)] hover:underline"
+        >
+          Send another message
+        </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-2 bg-red-50 rounded-lg border border-red-100 text-xs text-red-700">
-          {error}
+        <div className="alert-error">
+          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+          </svg>
+          <span>{error}</span>
         </div>
       )}
       <div>
+        <label className="field-label">Your Name</label>
         <input
           type="text"
-          placeholder="Your Name *"
+          placeholder="Jane Doe"
           value={form.name}
           onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
+          className="field-input"
         />
       </div>
       <div>
+        <label className="field-label">Your Email</label>
         <input
           type="email"
-          placeholder="Your Email *"
+          placeholder="jane@example.com"
           value={form.email}
           onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
+          className="field-input"
         />
       </div>
       <div>
+        <label className="field-label">Message</label>
         <textarea
-          rows={3}
-          placeholder="Your Message *"
+          rows={4}
+          placeholder="How can we help you?"
           value={form.message}
           onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))}
-          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200 resize-none"
+          className="field-input resize-y min-h-[100px]"
         />
       </div>
       <button
         type="submit"
         disabled={submitting}
-        className="btn-primary w-full text-sm text-center"
+        className="btn-primary w-full mt-2"
       >
-        {submitting ? 'Sending...' : 'Send Message'}
+        {submitting ? <><span className="spinner"/> Sending…</> : 'Send Message'}
       </button>
     </form>
   );

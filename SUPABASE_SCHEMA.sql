@@ -140,7 +140,7 @@ CREATE TABLE instructor_pupil_links (
 );
 
 -- ---------------------------------------------------------
--- 2.6 PUPIL INVITATIONS
+-- 2.6 PUPIL INVITATIONS (Legacy/Fallback)
 -- ---------------------------------------------------------
 CREATE TABLE pupil_invitations (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -154,6 +154,49 @@ CREATE TABLE pupil_invitations (
   accepted_at     TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------
+-- 2.6.A PUPIL INVITE LINKS (Modern web portal flow)
+-- ---------------------------------------------------------
+CREATE TABLE pupil_invite_links (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  token           TEXT NOT NULL UNIQUE,
+  is_active       BOOLEAN DEFAULT true,
+  expires_at      TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------
+-- 2.6.B PUPIL INVITE SUBMISSIONS (Modern web portal form data)
+-- ---------------------------------------------------------
+CREATE TABLE pupil_invite_submissions (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  link_id                 UUID NOT NULL REFERENCES pupil_invite_links(id) ON DELETE CASCADE,
+  instructor_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  pupil_token             TEXT NOT NULL,
+  first_name              TEXT NOT NULL DEFAULT '',
+  last_name               TEXT NOT NULL DEFAULT '',
+  email                   TEXT NOT NULL,
+  phone                   TEXT DEFAULT '',
+  address                 TEXT DEFAULT '',
+  postcode                TEXT DEFAULT '',
+  pickup_location         TEXT DEFAULT '',
+  dropoff_location        TEXT DEFAULT '',
+  preferred_days          JSONB DEFAULT '[]',
+  preferred_times         JSONB DEFAULT '[]',
+  learning_goals          TEXT DEFAULT '',
+  experience_level        TEXT DEFAULT '',
+  emergency_contact_name  TEXT DEFAULT '',
+  emergency_contact_phone TEXT DEFAULT '',
+  notes                   TEXT DEFAULT '',
+  status                  TEXT NOT NULL DEFAULT 'pending',
+  review_notes            TEXT,
+  reviewed_at             TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------
@@ -531,6 +574,13 @@ CREATE INDEX idx_pupil_invitations_instructor ON pupil_invitations(instructor_id
 CREATE INDEX idx_pupil_invitations_email ON pupil_invitations(email);
 CREATE INDEX idx_pupil_invitations_status ON pupil_invitations(status);
 
+-- Pupil Invite Links & Submissions
+CREATE INDEX idx_invite_links_instructor ON pupil_invite_links(instructor_id);
+CREATE INDEX idx_invite_links_token ON pupil_invite_links(token);
+CREATE INDEX idx_invite_submissions_link ON pupil_invite_submissions(link_id);
+CREATE INDEX idx_invite_submissions_instructor ON pupil_invite_submissions(instructor_id);
+CREATE INDEX idx_invite_submissions_pupil_token ON pupil_invite_submissions(pupil_token);
+
 -- Lessons
 CREATE INDEX idx_lessons_instructor ON lessons(instructor_id);
 CREATE INDEX idx_lessons_pupil ON lessons(pupil_id);
@@ -643,6 +693,8 @@ CREATE TRIGGER update_teaching_resources_updated_at BEFORE UPDATE ON teaching_re
 CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_instructor_subscriptions_updated_at BEFORE UPDATE ON instructor_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_pupil_invitations_updated_at BEFORE UPDATE ON pupil_invitations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_pupil_invite_links_updated_at BEFORE UPDATE ON pupil_invite_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_pupil_invite_subs_updated_at BEFORE UPDATE ON pupil_invite_submissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_promo_codes_updated_at BEFORE UPDATE ON promo_codes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_banners_updated_at BEFORE UPDATE ON banners FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_instructor_payment_requests_updated_at BEFORE UPDATE ON instructor_payment_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -656,6 +708,8 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pupils ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instructor_pupil_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pupil_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pupil_invite_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pupil_invite_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE open_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
@@ -702,6 +756,12 @@ CREATE POLICY "admins_read_all_profiles" ON profiles
 CREATE POLICY "insert_own_profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+CREATE POLICY "instructors_insert_pupil_profiles" ON profiles
+  FOR INSERT WITH CHECK (
+    role = 'pupil' AND 
+    EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'instructor')
+  );
+
 -- ---------------------------------------------------------
 -- 5.2 PUPILS: Instructors CRUD own pupils; pupils read own
 -- ---------------------------------------------------------
@@ -733,6 +793,24 @@ CREATE POLICY "instructors_manage_invitations" ON pupil_invitations
 
 CREATE POLICY "pupils_read_own_invitations" ON pupil_invitations
   FOR SELECT USING (email = (SELECT email FROM profiles WHERE id = auth.uid()));
+
+-- ---------------------------------------------------------
+-- 5.4.B PUPIL INVITE LINKS & SUBMISSIONS
+-- ---------------------------------------------------------
+CREATE POLICY "instructors_manage_invite_links" ON pupil_invite_links
+  FOR ALL USING (instructor_id = auth.uid());
+
+CREATE POLICY "public_read_invite_links" ON pupil_invite_links
+  FOR SELECT USING (true); -- allowed for web portal lookup
+
+CREATE POLICY "instructors_manage_invite_submissions" ON pupil_invite_submissions
+  FOR ALL USING (instructor_id = auth.uid());
+
+CREATE POLICY "public_insert_submissions" ON pupil_invite_submissions
+  FOR INSERT WITH CHECK (true); -- Web portal form
+
+CREATE POLICY "public_read_own_submissions" ON pupil_invite_submissions
+  FOR SELECT USING (true); -- Web portal uses query filters (pupil_token)
 
 -- ---------------------------------------------------------
 -- 5.5 LESSONS

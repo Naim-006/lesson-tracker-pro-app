@@ -2,10 +2,9 @@
 
 import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import AppLogo from '@/components/AppLogo';
-import DeveloperFooter from '@/components/DeveloperFooter';
+import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
-import { formatDateTime } from '@/lib/utils';
+import { submitFormSchema } from '@/lib/validators';
 
 interface LinkData {
   id: string;
@@ -148,14 +147,14 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
     e.preventDefault();
     if (!linkData) return;
 
-    // Validate required fields
-    if (!form.first_name.trim() || !form.last_name.trim() || !form.email.trim()) {
-      setError('Please fill in all required fields.');
-      return;
-    }
+    const zodResult = submitFormSchema.safeParse({
+      ...form,
+      link_token: linkData.id,
+    });
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      setError('Please enter a valid email address.');
+    if (!zodResult.success) {
+      const firstErr = zodResult.error.errors[0];
+      setError(firstErr?.message || 'Please check your form inputs.');
       return;
     }
 
@@ -163,36 +162,37 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
     setError('');
 
     try {
-      // Generate unique pupil token
-      const pupilToken = Math.random().toString(36).substring(2, 10).toUpperCase();
-
-      const { error: insertErr } = await supabase.from('pupil_invite_submissions').insert({
-        link_id: linkData.id,
-        instructor_id: linkData.instructor_id,
-        pupil_token: pupilToken,
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        email: form.email.trim().toLowerCase(),
-        phone: form.phone.trim() || null,
-        address: form.address.trim() || null,
-        postcode: form.postcode.trim() || null,
-        pickup_location: form.pickup_location.trim() || null,
-        dropoff_location: form.dropoff_location.trim() || null,
-        preferred_days: form.preferred_days.length > 0 ? form.preferred_days : null,
-        preferred_times: form.preferred_times.length > 0 ? form.preferred_times : null,
-        learning_goals: form.learning_goals.trim() || null,
-        experience_level: form.experience_level || null,
-        emergency_contact_name: form.emergency_contact_name.trim() || null,
-        emergency_contact_phone: form.emergency_contact_phone.trim() || null,
-        notes: form.notes.trim() || null,
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          link_token: token,
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          email: form.email.trim().toLowerCase(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          postcode: form.postcode.trim(),
+          pickup_location: form.pickup_location.trim(),
+          dropoff_location: form.dropoff_location.trim(),
+          preferred_days: form.preferred_days,
+          preferred_times: form.preferred_times,
+          learning_goals: form.learning_goals.trim(),
+          experience_level: form.experience_level,
+          emergency_contact_name: form.emergency_contact_name.trim(),
+          emergency_contact_phone: form.emergency_contact_phone.trim(),
+          notes: form.notes.trim(),
+        }),
       });
 
-      if (insertErr) {
-        if (insertErr.message?.includes('unique')) {
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 409) {
           setError('You have already submitted a registration with this email. Check your status below.');
           checkExistingSubmission(form.email);
         } else {
-          setError('Failed to submit. Please try again.');
+          setError(result?.error || 'Failed to submit. Please try again.');
         }
         setSubmitting(false);
         return;
@@ -200,9 +200,9 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
 
       setSubmitted(true);
       setExistingSubmission({
-        id: '',
+        id: result.id || '',
         status: 'pending',
-        created_at: new Date().toISOString(),
+        created_at: result.created_at || new Date().toISOString(),
         reviewed_at: null,
         review_notes: null,
         first_name: form.first_name,
@@ -218,10 +218,12 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-12 h-12 border-4 border-sunset-200 border-t-sunset-500 rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-gray-500">Loading...</p>
+      <div className="auth-page">
+        <div className="auth-card text-center">
+          <div className="w-14 h-14 bg-[var(--sunset-light)] rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <span className="spinner spinner-sunset" style={{width: 28, height: 28, borderWidth: 3}} />
+          </div>
+          <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">Loading invite…</h1>
         </div>
       </div>
     );
@@ -229,13 +231,15 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
 
   if (error && !linkData) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="glass-card rounded-3xl p-8 max-w-md w-full text-center animate-fade-in">
-          <AppLogo size="lg" />
-          <div className="mt-6 p-4 bg-red-50 rounded-2xl border border-red-100">
-            <p className="text-red-700 font-medium">{error}</p>
+      <div className="auth-page">
+        <div className="auth-card text-center">
+          <div className="w-16 h-16 bg-[#fef2f2] border border-[#fecaca] rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <svg className="w-8 h-8 text-[#991b1b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
           </div>
-          <DeveloperFooter />
+          <p className="text-sm font-semibold text-[#991b1b] mb-6">{error}</p>
+          <Link href="/" className="btn-secondary block w-full">Go Home</Link>
         </div>
       </div>
     );
@@ -243,68 +247,51 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
 
   if (submitted || existingSubmission) {
     const status = existingSubmission?.status || 'pending';
-    const statusMessages: Record<string, { title: string; desc: string; icon: string }> = {
-      pending: {
-        title: 'Registration Submitted!',
-        desc: 'Your instructor will review your registration shortly. You will be notified once approved.',
-        icon: '⏳',
-      },
-      approved: {
-        title: 'You\'re Approved!',
-        desc: 'Your instructor has approved your registration. You can now sign up for the Lesson Tracker app.',
-        icon: '🎉',
-      },
-      rejected: {
-        title: 'Registration Not Accepted',
-        desc: existingSubmission?.review_notes || 'Your instructor was unable to accept this registration. Please contact them directly.',
-        icon: '❌',
-      },
-    };
-
-    const s = statusMessages[status] || statusMessages.pending;
+    const s = {
+      pending: { title: 'Registration Submitted!', desc: 'Your instructor will review your registration shortly.', icon: '⏳', color: 'text-[#92400e]' },
+      approved: { title: "You're Approved!", desc: 'Your instructor has approved your registration.', icon: '🎉', color: 'text-[#166534]' },
+      rejected: { title: 'Registration Not Accepted', desc: existingSubmission?.review_notes || 'Your instructor was unable to accept this registration. Please contact them directly.', icon: '❌', color: 'text-[#991b1b]' },
+    }[status]!;
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="glass-card rounded-3xl p-8 max-w-md w-full animate-fade-in">
-          <AppLogo size="md" />
-          <div className="mt-6 text-center">
-            <div className="text-4xl mb-3">{s.icon}</div>
-            <h2 className="text-xl font-bold text-gray-900">{s.title}</h2>
-            <div className="mt-3">
-              <StatusBadge status={status} />
-            </div>
-            <p className="mt-3 text-sm text-gray-600 leading-relaxed">{s.desc}</p>
-
-            {status === 'approved' && (
-              <div className="mt-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                <p className="text-sm text-emerald-700 font-medium mb-2">
-                  Next Step: Download the App
-                </p>
-                <p className="text-xs text-emerald-600">
-                  Open the Lesson Tracker app, select <strong>&quot;I&apos;m a Pupil&quot;</strong>, and sign up using your email:
-                </p>
-                <p className="mt-2 text-sm font-mono font-semibold text-emerald-800 bg-white px-3 py-1.5 rounded-lg border border-emerald-200 inline-block">
-                  {existingSubmission?.email || form.email}
-                </p>
-              </div>
-            )}
-
-            {status === 'pending' && (
-              <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <p className="text-xs text-amber-700">
-                  You can check your status anytime by visiting this link again.
-                </p>
-              </div>
-            )}
-
-            {status === 'rejected' && existingSubmission?.review_notes && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200">
-                <p className="text-xs text-gray-500 font-medium">Instructor&apos;s note:</p>
-                <p className="text-sm text-gray-700 mt-1">{existingSubmission.review_notes}</p>
-              </div>
-            )}
+      <div className="auth-page py-12">
+        <div className="auth-card">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-4">{s.icon}</div>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-4">{s.title}</h2>
+            <StatusBadge status={status} />
           </div>
-          <DeveloperFooter />
+          <p className="text-center text-sm text-[var(--text-secondary)] mb-6 font-medium">{s.desc}</p>
+          
+          {status === 'approved' && (
+            <div className="mb-6 p-5 bg-[#f0fdf4] rounded-xl border border-[#bbf7d0]">
+               <p className="text-sm font-bold text-[#166534] mb-3">Next Step: Setup App</p>
+               <ol className="text-sm text-[#15803d] space-y-2 list-decimal list-inside font-medium">
+                 <li>Download the <strong>Lesson Tracker Pro</strong> app</li>
+                 <li>Select <strong>"I'm a Pupil"</strong></li>
+                 <li>Sign up using your email: <br/><strong className="ml-5 bg-white px-2 py-0.5 rounded border border-[#bbf7d0] mt-1 inline-block">{existingSubmission?.email || form.email}</strong></li>
+               </ol>
+            </div>
+          )}
+          
+          {status === 'pending' && (
+            <div className="mb-6 p-4 bg-[#fffbeb] rounded-xl border border-[#fde68a] text-center">
+              <p className="text-sm font-medium text-[#92400e]">
+                You can check your status anytime by following the link we sent to your email.
+              </p>
+            </div>
+          )}
+
+          {status === 'rejected' && existingSubmission?.review_notes && (
+             <div className="mb-6 p-5 bg-[var(--surface-2)] rounded-xl border border-[var(--border)]">
+               <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Instructor's note</p>
+               <p className="text-sm font-medium text-[var(--text-primary)]">{existingSubmission.review_notes}</p>
+             </div>
+          )}
+          
+          <div className="text-center">
+             <Link href="/" className="btn-secondary inline-block">Return to Home</Link>
+          </div>
         </div>
       </div>
     );
@@ -313,274 +300,176 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const times = ['Morning', 'Afternoon', 'Evening'];
 
+  const fieldsetLabel = "text-sm font-bold tracking-widest uppercase text-[var(--text-muted)] mb-4 pb-2 border-b border-[var(--border)]";
+
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-lg mx-auto">
-        <div className="glass-card rounded-3xl p-6 md:p-8 animate-fade-in">
-          <AppLogo size="md" />
-
-          <div className="mt-6 p-4 bg-sunset-50 rounded-2xl border border-sunset-100">
-            <p className="text-sm text-sunset-800">
-              You&apos;ve been invited by <strong>{linkData?.instructor_name}</strong> to register as a pupil.
-              Please fill in the form below.
-            </p>
+    <div className="auth-page py-12 h-auto shrink-0 items-start">
+      <div className="auth-card max-w-2xl w-full" style={{padding: '2.5rem'}}>
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-[var(--border)]">
+          <Link href="/" className="w-12 h-12 bg-gradient-to-br from-[#f3751f] to-[#e05a0c] rounded-xl flex items-center justify-center shadow-[var(--shadow-sunset)] shrink-0">
+            <span className="text-white font-black text-xl">L</span>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Pupil Registration</h1>
+            <p className="text-sm text-[var(--text-muted)] mt-1">Invited by <strong className="text-[var(--text-primary)]">{linkData?.instructor_name}</strong></p>
           </div>
-
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 rounded-xl border border-red-100 text-sm text-red-700 animate-fade-in">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            {/* Personal Info */}
-            <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-sunset-100 text-sunset-700 rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                Personal Information
-              </legend>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.first_name}
-                      onChange={(e) => updateField('first_name', e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                      placeholder="John"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.last_name}
-                      onChange={(e) => updateField('last_name', e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                      placeholder="Smith"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => updateField('email', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="john@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => updateField('phone', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="+44 7XXX XXX XXX"
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Location */}
-            <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-sunset-100 text-sunset-700 rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                Location
-              </legend>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={form.address}
-                    onChange={(e) => updateField('address', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="123 Main St, London"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Postcode</label>
-                  <input
-                    type="text"
-                    value={form.postcode}
-                    onChange={(e) => updateField('postcode', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="SW1A 1AA"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Pickup Location</label>
-                  <input
-                    type="text"
-                    value={form.pickup_location}
-                    onChange={(e) => updateField('pickup_location', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="Where should we pick you up?"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Dropoff Location</label>
-                  <input
-                    type="text"
-                    value={form.dropoff_location}
-                    onChange={(e) => updateField('dropoff_location', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="Where should we drop you off?"
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Availability */}
-            <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-sunset-100 text-sunset-700 rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                Availability
-              </legend>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">Preferred Days</label>
-                  <div className="flex flex-wrap gap-2">
-                    {days.map((day) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleDay(day)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                          form.preferred_days.includes(day)
-                            ? 'bg-sunset-500 text-white border-sunset-500'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-sunset-300'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">Preferred Times</label>
-                  <div className="flex flex-wrap gap-2">
-                    {times.map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => toggleTime(time)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                          form.preferred_times.includes(time)
-                            ? 'bg-sunset-500 text-white border-sunset-500'
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-sunset-300'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Learning */}
-            <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-sunset-100 text-sunset-700 rounded-full flex items-center justify-center text-xs font-bold">4</span>
-                Learning Details
-              </legend>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Experience Level</label>
-                  <select
-                    value={form.experience_level}
-                    onChange={(e) => updateField('experience_level', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                  >
-                    <option value="">Select...</option>
-                    <option value="complete_beginner">Complete Beginner</option>
-                    <option value="some_experience">Some Experience</option>
-                    <option value="previously_learnt">Previously Learnt</option>
-                    <option value="need_practice">Need Practice</option>
-                    <option value="test_ready">Ready for Test</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Learning Goals</label>
-                  <textarea
-                    value={form.learning_goals}
-                    onChange={(e) => updateField('learning_goals', e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200 resize-none"
-                    placeholder="What do you want to achieve?"
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Emergency Contact */}
-            <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-sunset-100 text-sunset-700 rounded-full flex items-center justify-center text-xs font-bold">5</span>
-                Emergency Contact
-              </legend>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Contact Name</label>
-                  <input
-                    type="text"
-                    value={form.emergency_contact_name}
-                    onChange={(e) => updateField('emergency_contact_name', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="Emergency contact name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={form.emergency_contact_phone}
-                    onChange={(e) => updateField('emergency_contact_phone', e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200"
-                    placeholder="+44 7XXX XXX XXX"
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Additional Notes</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => updateField('notes', e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-sunset-200 resize-none"
-                placeholder="Anything else your instructor should know?"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-primary w-full text-center"
-            >
-              {submitting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Submitting...
-                </span>
-              ) : (
-                'Submit Registration'
-              )}
-            </button>
-          </form>
         </div>
 
-        <DeveloperFooter />
+        {error && (
+          <div className="alert-error mb-6">
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10 15a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-10">
+          
+          {/* Section 1: Personal */}
+          <fieldset>
+            <legend className={fieldsetLabel}>1. Personal Info</legend>
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">First Name *</label>
+                  <input type="text" required value={form.first_name} onChange={(e) => updateField('first_name', e.target.value)} className="field-input" placeholder="Emma" />
+                </div>
+                <div>
+                  <label className="field-label">Last Name *</label>
+                  <input type="text" required value={form.last_name} onChange={(e) => updateField('last_name', e.target.value)} className="field-input" placeholder="Watson" />
+                </div>
+              </div>
+              <div>
+                <label className="field-label">Email Address *</label>
+                <input type="email" required value={form.email} onChange={(e) => updateField('email', e.target.value)} className="field-input" placeholder="emma@example.com" />
+              </div>
+              <div>
+                <label className="field-label">Phone Number</label>
+                <input type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} className="field-input" placeholder="+44 7000 000000" />
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Section 2: Location */}
+          <fieldset>
+             <legend className={fieldsetLabel}>2. Location</legend>
+             <div className="space-y-4">
+               <div>
+                 <label className="field-label">Address</label>
+                 <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} className="field-input" placeholder="123 High Street, London" />
+               </div>
+               <div>
+                 <label className="field-label">Postcode</label>
+                 <input type="text" value={form.postcode} onChange={(e) => updateField('postcode', e.target.value)} className="field-input" placeholder="SW1A 1AA" />
+               </div>
+               <div className="grid md:grid-cols-2 gap-4 mt-2">
+                 <div>
+                   <label className="field-label">Pickup Location</label>
+                   <input type="text" value={form.pickup_location} onChange={(e) => updateField('pickup_location', e.target.value)} className="field-input" placeholder="e.g. Home or College" />
+                 </div>
+                 <div>
+                   <label className="field-label">Dropoff Location</label>
+                   <input type="text" value={form.dropoff_location} onChange={(e) => updateField('dropoff_location', e.target.value)} className="field-input" placeholder="e.g. Same as pickup" />
+                 </div>
+               </div>
+             </div>
+          </fieldset>
+
+          {/* Section 3: Availability */}
+          <fieldset>
+             <legend className={fieldsetLabel}>3. Availability</legend>
+             <div className="space-y-5">
+               <div>
+                 <label className="field-label">Preferred Days</label>
+                 <div className="flex flex-wrap gap-2">
+                   {days.map((day) => {
+                     const active = form.preferred_days.includes(day);
+                     return (
+                       <button
+                         key={day}
+                         type="button"
+                         onClick={() => toggleDay(day)}
+                         className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${
+                           active ? 'bg-[var(--sunset-light)] text-[var(--sunset)] border-[var(--sunset)]' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-strong)] hover:border-[var(--sunset)] hover:text-[var(--text-primary)]'
+                         }`}
+                       >
+                         {day}
+                       </button>
+                     );
+                   })}
+                 </div>
+               </div>
+               <div>
+                 <label className="field-label">Preferred Times</label>
+                 <div className="flex flex-wrap gap-2">
+                   {times.map((time) => {
+                      const active = form.preferred_times.includes(time);
+                      return (
+                       <button
+                         key={time}
+                         type="button"
+                         onClick={() => toggleTime(time)}
+                         className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${
+                           active ? 'bg-[var(--sunset-light)] text-[var(--sunset)] border-[var(--sunset)]' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-strong)] hover:border-[var(--sunset)] hover:text-[var(--text-primary)]'
+                         }`}
+                       >
+                         {time}
+                       </button>
+                      )
+                   })}
+                 </div>
+               </div>
+             </div>
+          </fieldset>
+
+          {/* Section 4: Learning */}
+          <fieldset>
+             <legend className={fieldsetLabel}>4. Learning History</legend>
+             <div className="space-y-4">
+                <div>
+                   <label className="field-label">Experience Level</label>
+                   <select value={form.experience_level} onChange={(e) => updateField('experience_level', e.target.value)} className="field-input bg-white">
+                      <option value="">Select an option...</option>
+                      <option value="complete_beginner">Complete Beginner</option>
+                      <option value="some_experience">Some Experience</option>
+                      <option value="previously_learnt">Previously Learnt</option>
+                      <option value="need_practice">Need Practice</option>
+                      <option value="test_ready">Ready for Test</option>
+                   </select>
+                </div>
+                <div>
+                   <label className="field-label">Learning Goals</label>
+                   <textarea rows={3} value={form.learning_goals} onChange={(e) => updateField('learning_goals', e.target.value)} className="field-input resize-y min-h-[80px]" placeholder="e.g. Pass test in 3 months..." />
+                </div>
+             </div>
+          </fieldset>
+
+          {/* Section 5: Emergency */}
+          <fieldset>
+             <legend className={fieldsetLabel}>5. Emergency Contact</legend>
+             <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                   <label className="field-label">Contact Name</label>
+                   <input type="text" value={form.emergency_contact_name} onChange={(e) => updateField('emergency_contact_name', e.target.value)} className="field-input" placeholder="Relation & Name" />
+                </div>
+                <div>
+                   <label className="field-label">Contact Phone</label>
+                   <input type="tel" value={form.emergency_contact_phone} onChange={(e) => updateField('emergency_contact_phone', e.target.value)} className="field-input" placeholder="+44 7XXX XXX XXX" />
+                </div>
+             </div>
+          </fieldset>
+          
+          <div className="pt-2">
+             <label className="field-label">Additional Notes</label>
+             <textarea rows={2} value={form.notes} onChange={(e) => updateField('notes', e.target.value)} className="field-input resize-y min-h-[80px]" placeholder="Anything else you'd like your instructor to know?" />
+          </div>
+
+          <button type="submit" disabled={submitting} className="btn-primary w-full py-4 text-base">
+            {submitting ? <><span className="spinner" /> Submitting…</> : 'Submit Registration'}
+          </button>
+        </form>
       </div>
     </div>
   );
