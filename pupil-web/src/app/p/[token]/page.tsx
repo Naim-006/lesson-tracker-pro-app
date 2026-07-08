@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { formatDateTime } from '@/lib/utils';
@@ -18,8 +18,8 @@ interface SubmissionData {
   instructor_name?: string;
 }
 
-export default function PupilStatusPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+export default function PupilStatusPage({ params }: { params: { token: string } }) {
+  const { token } = params;
   const [data, setData] = useState<SubmissionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

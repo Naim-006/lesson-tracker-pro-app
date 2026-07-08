@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
@@ -25,8 +25,8 @@ interface ExistingSubmission {
   email: string;
 }
 
-export default function PupilInvitePage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+export default function PupilInvitePage({ params }: { params: { token: string } }) {
+  const { token } = params;
   const [linkData, setLinkData] = useState<LinkData | null>(null);
   const [existingSubmission, setExistingSubmission] = useState<ExistingSubmission | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,13 +85,11 @@ export default function PupilInvitePage({ params }: { params: Promise<{ token: s
       // Get instructor name
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('full_name')
         .eq('id', link.instructor_id)
         .single();
 
-      const instructorName = profile
-        ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-        : 'Your instructor';
+      const instructorName = profile?.full_name?.trim() || 'Your instructor';
 
       setLinkData({ ...link, instructor_name: instructorName });
       setLoading(false);
