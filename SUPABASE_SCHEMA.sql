@@ -1,37 +1,35 @@
 -- =============================================================
--- LESSON TRACKER PRO - COMPLETE DATABASE SCHEMA
--- Supabase PostgreSQL Production Schema
--- Run this entire file in Supabase SQL Editor
+-- LESSON TRACKER PRO — COMPLETE DATABASE SCHEMA
+-- Supabase PostgreSQL Production Schema (Single Source of Truth)
+-- Run this entire file in Supabase SQL Editor for a FRESH setup.
+-- Last updated: 2026-07-08
 -- =============================================================
 
 -- =============================================================
 -- PART 1: ENUMS
 -- =============================================================
+-- Use DO blocks so re-running doesn't fail on existing types.
 
-CREATE TYPE pupil_status AS ENUM ('current', 'waiting', 'passed', 'archived', 'cancelled');
-CREATE TYPE gearbox_type AS ENUM ('any', 'manual', 'automatic');
-CREATE TYPE lesson_status AS ENUM ('scheduled', 'completed', 'cancelled', 'no_show');
-CREATE TYPE lesson_type AS ENUM ('driving_lesson', 'mock_test_session', 'refresher_course', 'administrative_block');
-CREATE TYPE booking_status AS ENUM ('confirmed', 'tentative', 'completed');
-CREATE TYPE payment_method AS ENUM ('bank_transfer', 'cash', 'card', 'paypal', 'lesson_tracker_pro', 'cheque', 'online');
-CREATE TYPE payment_type AS ENUM ('individual', 'block');
-CREATE TYPE transaction_type AS ENUM ('income', 'expense');
-CREATE TYPE expense_category AS ENUM (
-  'accounts', 'advertising', 'association', 'bank_charges', 'computer',
-  'dvsa_fees', 'equipment', 'food_drink', 'franchise_fee', 'fuel',
-  'insurance_business', 'insurance_personal', 'insurance_vehicle',
-  'insurance', 'maintenance', 'lease', 'training', 'other'
-);
-CREATE TYPE recurrence_type AS ENUM ('daily', 'working_days', 'weekly', 'fortnightly');
-CREATE TYPE slot_group_filter AS ENUM ('current_pupils_only', 'private_to_school');
-CREATE TYPE enquiry_status AS ENUM ('pending', 'contacted', 'interested', 'not_interested', 'converted');
-CREATE TYPE experience_level AS ENUM ('beginner', 'intermediate', 'advanced');
-CREATE TYPE test_result AS ENUM ('pending', 'pass', 'fail');
-CREATE TYPE message_status AS ENUM ('sending', 'sent', 'delivered', 'seen');
-CREATE TYPE subscription_status AS ENUM ('active', 'cancelled', 'expired', 'trial');
-CREATE TYPE payment_request_status AS ENUM ('pending', 'approved', 'rejected', 'paid');
-CREATE TYPE invitation_status AS ENUM ('pending', 'approved', 'accepted', 'declined');
-CREATE TYPE resource_visibility AS ENUM ('public', 'private', 'selective');
+DO $$ BEGIN CREATE TYPE pupil_status AS ENUM ('current','waiting','passed','archived','cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE gearbox_type AS ENUM ('any','manual','automatic'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE lesson_status AS ENUM ('scheduled','completed','cancelled','no_show'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE lesson_type AS ENUM ('driving_lesson','mock_test_session','refresher_course','administrative_block'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE booking_status AS ENUM ('confirmed','tentative','completed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE payment_method AS ENUM ('bank_transfer','cash','card','paypal','lesson_tracker_pro','cheque','online'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE payment_type AS ENUM ('individual','block'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE transaction_type AS ENUM ('income','expense'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE expense_category AS ENUM ('accounts','advertising','association','bank_charges','computer','dvsa_fees','equipment','food_drink','franchise_fee','fuel','insurance_business','insurance_personal','insurance_vehicle','insurance','maintenance','lease','training','other'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE recurrence_type AS ENUM ('daily','working_days','weekly','fortnightly'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE slot_group_filter AS ENUM ('current_pupils_only','private_to_school'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE enquiry_status AS ENUM ('pending','contacted','interested','not_interested','converted'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE experience_level AS ENUM ('beginner','intermediate','advanced'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE test_result AS ENUM ('pending','pass','fail'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE message_status AS ENUM ('sending','sent','delivered','seen'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE subscription_status AS ENUM ('active','cancelled','expired','trial'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE payment_request_status AS ENUM ('pending','approved','rejected','paid'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE invitation_status AS ENUM ('pending','approved','accepted','declined'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE resource_visibility AS ENUM ('public','private','selective'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 
 -- =============================================================
 -- PART 2: TABLES
@@ -39,24 +37,26 @@ CREATE TYPE resource_visibility AS ENUM ('public', 'private', 'selective');
 
 -- ---------------------------------------------------------
 -- 2.1 PROFILES (extends Supabase auth.users)
+--     One row per authenticated user (instructor, pupil, admin)
 -- ---------------------------------------------------------
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name       TEXT NOT NULL DEFAULT '',
   email           TEXT NOT NULL DEFAULT '',
   phone           TEXT NOT NULL DEFAULT '',
   avatar_url      TEXT,
   business_name   TEXT DEFAULT '',
-  role            TEXT NOT NULL DEFAULT 'instructor' CHECK (role IN ('instructor', 'pupil', 'admin')),
+  role            TEXT NOT NULL DEFAULT 'instructor' CHECK (role IN ('instructor','pupil','admin')),
   email_verified  BOOLEAN DEFAULT false,
+  payment_info    JSONB DEFAULT '{}',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------
--- 2.2 INSTRUCTOR SUBSCRIPTION PLANS
+-- 2.2 SUBSCRIPTION PLANS (SaaS tiers)
 -- ---------------------------------------------------------
-CREATE TABLE subscription_plans (
+CREATE TABLE IF NOT EXISTS subscription_plans (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name            TEXT NOT NULL,
   price           DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -72,7 +72,7 @@ CREATE TABLE subscription_plans (
 -- ---------------------------------------------------------
 -- 2.3 INSTRUCTOR SUBSCRIPTIONS
 -- ---------------------------------------------------------
-CREATE TABLE instructor_subscriptions (
+CREATE TABLE IF NOT EXISTS instructor_subscriptions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   plan_id         UUID REFERENCES subscription_plans(id) ON DELETE SET NULL,
@@ -88,8 +88,11 @@ CREATE TABLE instructor_subscriptions (
 
 -- ---------------------------------------------------------
 -- 2.4 PUPILS
+--     Central pupil table. Works for BOTH manual (offline)
+--     and registered (online) pupils. No join to profiles
+--     needed — all pupil data lives here.
 -- ---------------------------------------------------------
-CREATE TABLE pupils (
+CREATE TABLE IF NOT EXISTS pupils (
   id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id                   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   first_name                      TEXT NOT NULL DEFAULT '',
@@ -124,13 +127,14 @@ CREATE TABLE pupils (
   test_date                       DATE,
   test_passed                     BOOLEAN,
   created_at                      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at                      TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at                      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(instructor_id, email)
 );
 
 -- ---------------------------------------------------------
 -- 2.5 INSTRUCTOR-PUPIL LINKS
 -- ---------------------------------------------------------
-CREATE TABLE instructor_pupil_links (
+CREATE TABLE IF NOT EXISTS instructor_pupil_links (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   pupil_id        UUID NOT NULL REFERENCES pupils(id) ON DELETE CASCADE,
@@ -140,9 +144,9 @@ CREATE TABLE instructor_pupil_links (
 );
 
 -- ---------------------------------------------------------
--- 2.6 PUPIL INVITATIONS (Legacy/Fallback)
+-- 2.6 PUPIL INVITATIONS (Legacy / fallback)
 -- ---------------------------------------------------------
-CREATE TABLE pupil_invitations (
+CREATE TABLE IF NOT EXISTS pupil_invitations (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   email           TEXT NOT NULL,
@@ -157,9 +161,9 @@ CREATE TABLE pupil_invitations (
 );
 
 -- ---------------------------------------------------------
--- 2.6.A PUPIL INVITE LINKS (Modern web portal flow)
+-- 2.7 PUPIL INVITE LINKS (Modern web portal flow)
 -- ---------------------------------------------------------
-CREATE TABLE pupil_invite_links (
+CREATE TABLE IF NOT EXISTS pupil_invite_links (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   token           TEXT NOT NULL UNIQUE,
@@ -170,9 +174,9 @@ CREATE TABLE pupil_invite_links (
 );
 
 -- ---------------------------------------------------------
--- 2.6.B PUPIL INVITE SUBMISSIONS (Modern web portal form data)
+-- 2.8 PUPIL INVITE SUBMISSIONS (Web portal form data)
 -- ---------------------------------------------------------
-CREATE TABLE pupil_invite_submissions (
+CREATE TABLE IF NOT EXISTS pupil_invite_submissions (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   link_id                 UUID NOT NULL REFERENCES pupil_invite_links(id) ON DELETE CASCADE,
   instructor_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -200,9 +204,9 @@ CREATE TABLE pupil_invite_submissions (
 );
 
 -- ---------------------------------------------------------
--- 2.7 LESSONS
+-- 2.9 LESSONS
 -- ---------------------------------------------------------
-CREATE TABLE lessons (
+CREATE TABLE IF NOT EXISTS lessons (
   id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id                   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   pupil_id                        UUID NOT NULL REFERENCES pupils(id) ON DELETE CASCADE,
@@ -228,9 +232,9 @@ CREATE TABLE lessons (
 );
 
 -- ---------------------------------------------------------
--- 2.8 OPEN SLOTS
+-- 2.10 OPEN SLOTS
 -- ---------------------------------------------------------
-CREATE TABLE open_slots (
+CREATE TABLE IF NOT EXISTS open_slots (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   date                DATE NOT NULL,
@@ -252,9 +256,9 @@ CREATE TABLE open_slots (
 );
 
 -- ---------------------------------------------------------
--- 2.9 CALENDAR EVENTS
+-- 2.11 CALENDAR EVENTS
 -- ---------------------------------------------------------
-CREATE TABLE calendar_events (
+CREATE TABLE IF NOT EXISTS calendar_events (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title                   TEXT NOT NULL,
@@ -271,9 +275,9 @@ CREATE TABLE calendar_events (
 );
 
 -- ---------------------------------------------------------
--- 2.10 TRANSACTIONS (Income & Expenses)
+-- 2.12 TRANSACTIONS (Income & Expenses)
 -- ---------------------------------------------------------
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   pupil_id        UUID REFERENCES pupils(id) ON DELETE SET NULL,
@@ -295,9 +299,9 @@ CREATE TABLE transactions (
 );
 
 -- ---------------------------------------------------------
--- 2.11 INVOICES (Payment Requests from Instructor to Pupil)
+-- 2.13 INVOICES (Instructor → Pupil payment requests)
 -- ---------------------------------------------------------
-CREATE TABLE invoices (
+CREATE TABLE IF NOT EXISTS invoices (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id           UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   pupil_id                UUID NOT NULL REFERENCES pupils(id) ON DELETE CASCADE,
@@ -312,9 +316,9 @@ CREATE TABLE invoices (
 );
 
 -- ---------------------------------------------------------
--- 2.12 MESSAGES (Instructor-Pupil Chat)
+-- 2.14 MESSAGES (Instructor ↔ Pupil chat)
 -- ---------------------------------------------------------
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   receiver_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -332,9 +336,9 @@ CREATE TABLE messages (
 );
 
 -- ---------------------------------------------------------
--- 2.13 NOTIFICATIONS
+-- 2.15 NOTIFICATIONS
 -- ---------------------------------------------------------
-CREATE TABLE app_notifications (
+CREATE TABLE IF NOT EXISTS app_notifications (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title           TEXT NOT NULL,
@@ -344,9 +348,9 @@ CREATE TABLE app_notifications (
 );
 
 -- ---------------------------------------------------------
--- 2.14 ENQUIRIES
+-- 2.16 ENQUIRIES
 -- ---------------------------------------------------------
-CREATE TABLE enquiries (
+CREATE TABLE IF NOT EXISTS enquiries (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id           UUID REFERENCES profiles(id) ON DELETE CASCADE,
   first_name              TEXT NOT NULL DEFAULT '',
@@ -372,9 +376,9 @@ CREATE TABLE enquiries (
 );
 
 -- ---------------------------------------------------------
--- 2.15 TEST REPORTS
+-- 2.17 TEST REPORTS
 -- ---------------------------------------------------------
-CREATE TABLE test_reports (
+CREATE TABLE IF NOT EXISTS test_reports (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   pupil_id          UUID NOT NULL REFERENCES pupils(id) ON DELETE CASCADE,
@@ -397,9 +401,9 @@ CREATE TABLE test_reports (
 );
 
 -- ---------------------------------------------------------
--- 2.16 MILEAGE ENTRIES
+-- 2.18 MILEAGE ENTRIES
 -- ---------------------------------------------------------
-CREATE TABLE mileage_entries (
+CREATE TABLE IF NOT EXISTS mileage_entries (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   miles           DECIMAL(8,1) NOT NULL,
@@ -409,9 +413,9 @@ CREATE TABLE mileage_entries (
 );
 
 -- ---------------------------------------------------------
--- 2.17 VEHICLES
+-- 2.19 VEHICLES
 -- ---------------------------------------------------------
-CREATE TABLE vehicles (
+CREATE TABLE IF NOT EXISTS vehicles (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   make                TEXT NOT NULL DEFAULT '',
@@ -429,9 +433,9 @@ CREATE TABLE vehicles (
 );
 
 -- ---------------------------------------------------------
--- 2.18 PROGRESS CATEGORIES
+-- 2.20 PROGRESS CATEGORIES
 -- ---------------------------------------------------------
-CREATE TABLE progress_categories (
+CREATE TABLE IF NOT EXISTS progress_categories (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title           TEXT NOT NULL,
@@ -442,9 +446,9 @@ CREATE TABLE progress_categories (
 );
 
 -- ---------------------------------------------------------
--- 2.19 PROGRESS SKILLS
+-- 2.21 PROGRESS SKILLS
 -- ---------------------------------------------------------
-CREATE TABLE progress_skills (
+CREATE TABLE IF NOT EXISTS progress_skills (
   id                            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id                   UUID NOT NULL REFERENCES progress_categories(id) ON DELETE CASCADE,
   pupil_id                      UUID NOT NULL REFERENCES pupils(id) ON DELETE CASCADE,
@@ -458,25 +462,30 @@ CREATE TABLE progress_skills (
 );
 
 -- ---------------------------------------------------------
--- 2.20 TEACHING RESOURCES
+-- 2.22 TEACHING RESOURCES
+--     Columns match Dart code: type, category, video_link,
+--     resource_link, share_link, visibility, selected_pupil_ids
 -- ---------------------------------------------------------
-CREATE TABLE teaching_resources (
+CREATE TABLE IF NOT EXISTS teaching_resources (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title               TEXT NOT NULL,
   description         TEXT DEFAULT '',
-  file_url            TEXT,
-  file_type           TEXT DEFAULT 'link',
-  visibility          resource_visibility NOT NULL DEFAULT 'public',
+  type                TEXT NOT NULL DEFAULT 'document',
+  category            TEXT NOT NULL DEFAULT 'Lesson Plans',
+  video_link          TEXT,
+  resource_link       TEXT,
+  share_link          TEXT,
+  visibility          TEXT NOT NULL DEFAULT 'private',
   selected_pupil_ids  JSONB DEFAULT '[]',
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------
--- 2.21 ACTIVITY LOGS
+-- 2.23 ACTIVITY LOGS
 -- ---------------------------------------------------------
-CREATE TABLE instructor_activity_logs (
+CREATE TABLE IF NOT EXISTS instructor_activity_logs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   action          TEXT NOT NULL,
@@ -485,13 +494,13 @@ CREATE TABLE instructor_activity_logs (
 );
 
 -- ---------------------------------------------------------
--- 2.22 PROMO CODES (Admin)
+-- 2.24 PROMO CODES (Admin)
 -- ---------------------------------------------------------
-CREATE TABLE promo_codes (
+CREATE TABLE IF NOT EXISTS promo_codes (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code            TEXT NOT NULL UNIQUE,
   description     TEXT DEFAULT '',
-  discount_type   TEXT NOT NULL DEFAULT 'percentage' CHECK (discount_type IN ('percentage', 'fixed')),
+  discount_type   TEXT NOT NULL DEFAULT 'percentage' CHECK (discount_type IN ('percentage','fixed')),
   discount_value  DECIMAL(10,2) NOT NULL,
   max_uses        INT DEFAULT 0,
   current_uses    INT DEFAULT 0,
@@ -502,9 +511,9 @@ CREATE TABLE promo_codes (
 );
 
 -- ---------------------------------------------------------
--- 2.23 BANNERS (Public)
+-- 2.25 BANNERS (Public)
 -- ---------------------------------------------------------
-CREATE TABLE banners (
+CREATE TABLE IF NOT EXISTS banners (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title           TEXT NOT NULL DEFAULT '',
   image_url       TEXT,
@@ -516,18 +525,18 @@ CREATE TABLE banners (
 );
 
 -- ---------------------------------------------------------
--- 2.24 APP SETTINGS (Key-Value Store)
+-- 2.26 APP SETTINGS (Key-Value store)
 -- ---------------------------------------------------------
-CREATE TABLE app_settings (
+CREATE TABLE IF NOT EXISTS app_settings (
   key             TEXT PRIMARY KEY,
   value           JSONB NOT NULL DEFAULT '{}',
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------
--- 2.25 INSTRUCTOR LOCATIONS (GPS Tracking)
+-- 2.27 INSTRUCTOR LOCATIONS (GPS)
 -- ---------------------------------------------------------
-CREATE TABLE instructor_locations (
+CREATE TABLE IF NOT EXISTS instructor_locations (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   latitude        DECIMAL(10,7) NOT NULL,
@@ -537,9 +546,9 @@ CREATE TABLE instructor_locations (
 );
 
 -- ---------------------------------------------------------
--- 2.26 PAYMENT REQUESTS (Instructor → Admin)
+-- 2.28 PAYMENT REQUESTS (Instructor → Admin)
 -- ---------------------------------------------------------
-CREATE TABLE instructor_payment_requests (
+CREATE TABLE IF NOT EXISTS instructor_payment_requests (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instructor_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   amount          DECIMAL(10,2) NOT NULL,
@@ -551,117 +560,144 @@ CREATE TABLE instructor_payment_requests (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ---------------------------------------------------------
+-- 2.29 EVENTS (Admin platform announcements / blog)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS events (
+  id              SERIAL PRIMARY KEY,
+  title           TEXT NOT NULL,
+  description     TEXT,
+  event_date      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_published    BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------
+-- 2.30 INSTRUCTOR PAYMENTS (SaaS subscription payments)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS instructor_payments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  instructor_id   UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  amount          DECIMAL(10,2) NOT NULL,
+  payment_date    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status          TEXT NOT NULL DEFAULT 'pending',
+  payment_method  TEXT NOT NULL DEFAULT 'other',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
 -- =============================================================
 -- PART 3: INDEXES
 -- =============================================================
 
 -- Profiles
-CREATE INDEX idx_profiles_role ON profiles(role);
-CREATE INDEX idx_profiles_email ON profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 
 -- Pupils
-CREATE INDEX idx_pupils_instructor ON pupils(instructor_id);
-CREATE INDEX idx_pupils_status ON pupils(status);
-CREATE INDEX idx_pupils_email ON pupils(email);
-CREATE INDEX idx_pupils_phone ON pupils(phone);
+CREATE INDEX IF NOT EXISTS idx_pupils_instructor ON pupils(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_pupils_status ON pupils(status);
+CREATE INDEX IF NOT EXISTS idx_pupils_email ON pupils(email);
+CREATE INDEX IF NOT EXISTS idx_pupils_phone ON pupils(phone);
 
 -- Instructor-Pupil Links
-CREATE INDEX idx_ipl_instructor ON instructor_pupil_links(instructor_id);
-CREATE INDEX idx_ipl_pupil ON instructor_pupil_links(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_ipl_instructor ON instructor_pupil_links(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_ipl_pupil ON instructor_pupil_links(pupil_id);
 
 -- Pupil Invitations
-CREATE INDEX idx_pupil_invitations_instructor ON pupil_invitations(instructor_id);
-CREATE INDEX idx_pupil_invitations_email ON pupil_invitations(email);
-CREATE INDEX idx_pupil_invitations_status ON pupil_invitations(status);
+CREATE INDEX IF NOT EXISTS idx_pupil_invitations_instructor ON pupil_invitations(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_pupil_invitations_email ON pupil_invitations(email);
+CREATE INDEX IF NOT EXISTS idx_pupil_invitations_status ON pupil_invitations(status);
 
 -- Pupil Invite Links & Submissions
-CREATE INDEX idx_invite_links_instructor ON pupil_invite_links(instructor_id);
-CREATE INDEX idx_invite_links_token ON pupil_invite_links(token);
-CREATE INDEX idx_invite_submissions_link ON pupil_invite_submissions(link_id);
-CREATE INDEX idx_invite_submissions_instructor ON pupil_invite_submissions(instructor_id);
-CREATE INDEX idx_invite_submissions_pupil_token ON pupil_invite_submissions(pupil_token);
+CREATE INDEX IF NOT EXISTS idx_invite_links_instructor ON pupil_invite_links(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_invite_links_token ON pupil_invite_links(token);
+CREATE INDEX IF NOT EXISTS idx_invite_submissions_link ON pupil_invite_submissions(link_id);
+CREATE INDEX IF NOT EXISTS idx_invite_submissions_instructor ON pupil_invite_submissions(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_invite_submissions_pupil_token ON pupil_invite_submissions(pupil_token);
 
 -- Lessons
-CREATE INDEX idx_lessons_instructor ON lessons(instructor_id);
-CREATE INDEX idx_lessons_pupil ON lessons(pupil_id);
-CREATE INDEX idx_lessons_date ON lessons(date);
-CREATE INDEX idx_lessons_instructor_date ON lessons(instructor_id, date);
-CREATE INDEX idx_lessons_status ON lessons(status);
+CREATE INDEX IF NOT EXISTS idx_lessons_instructor ON lessons(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_pupil ON lessons(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_date ON lessons(date);
+CREATE INDEX IF NOT EXISTS idx_lessons_instructor_date ON lessons(instructor_id, date);
+CREATE INDEX IF NOT EXISTS idx_lessons_status ON lessons(status);
 
 -- Open Slots
-CREATE INDEX idx_open_slots_instructor ON open_slots(instructor_id);
-CREATE INDEX idx_open_slots_date ON open_slots(date);
-CREATE INDEX idx_open_slots_available ON open_slots(instructor_id, date) WHERE is_booked = false;
+CREATE INDEX IF NOT EXISTS idx_open_slots_instructor ON open_slots(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_open_slots_date ON open_slots(date);
 
 -- Calendar Events
-CREATE INDEX idx_calendar_events_instructor ON calendar_events(instructor_id);
-CREATE INDEX idx_calendar_events_date ON calendar_events(date);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_instructor ON calendar_events(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(date);
 
 -- Transactions
-CREATE INDEX idx_transactions_instructor ON transactions(instructor_id);
-CREATE INDEX idx_transactions_pupil ON transactions(pupil_id);
-CREATE INDEX idx_transactions_date ON transactions(date);
-CREATE INDEX idx_transactions_type ON transactions(instructor_id, type);
+CREATE INDEX IF NOT EXISTS idx_transactions_instructor ON transactions(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_pupil ON transactions(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(instructor_id, type);
 
 -- Invoices
-CREATE INDEX idx_invoices_instructor ON invoices(instructor_id);
-CREATE INDEX idx_invoices_pupil ON invoices(pupil_id);
-CREATE INDEX idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_instructor ON invoices(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_pupil ON invoices(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 
 -- Messages
-CREATE INDEX idx_messages_sender ON messages(sender_id);
-CREATE INDEX idx_messages_receiver ON messages(receiver_id);
-CREATE INDEX idx_messages_pupil ON messages(pupil_id);
-CREATE INDEX idx_messages_created ON messages(created_at);
-CREATE INDEX idx_messages_conversation ON messages(sender_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_pupil ON messages(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(sender_id, receiver_id);
 
 -- Notifications
-CREATE INDEX idx_notifications_user ON app_notifications(user_id);
-CREATE INDEX idx_notifications_read ON app_notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON app_notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON app_notifications(user_id, is_read);
 
 -- Enquiries
-CREATE INDEX idx_enquiries_instructor ON enquiries(instructor_id);
-CREATE INDEX idx_enquiries_status ON enquiries(status);
+CREATE INDEX IF NOT EXISTS idx_enquiries_instructor ON enquiries(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_enquiries_status ON enquiries(status);
 
 -- Test Reports
-CREATE INDEX idx_test_reports_instructor ON test_reports(instructor_id);
-CREATE INDEX idx_test_reports_pupil ON test_reports(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_test_reports_instructor ON test_reports(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_test_reports_pupil ON test_reports(pupil_id);
 
 -- Mileage
-CREATE INDEX idx_mileage_instructor ON mileage_entries(instructor_id);
-CREATE INDEX idx_mileage_date ON mileage_entries(date);
+CREATE INDEX IF NOT EXISTS idx_mileage_instructor ON mileage_entries(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_mileage_date ON mileage_entries(date);
 
 -- Vehicles
-CREATE INDEX idx_vehicles_instructor ON vehicles(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_vehicles_instructor ON vehicles(instructor_id);
 
 -- Progress
-CREATE INDEX idx_progress_categories_instructor ON progress_categories(instructor_id);
-CREATE INDEX idx_progress_skills_pupil ON progress_skills(pupil_id);
-CREATE INDEX idx_progress_skills_category ON progress_skills(category_id);
+CREATE INDEX IF NOT EXISTS idx_progress_categories_instructor ON progress_categories(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_progress_skills_pupil ON progress_skills(pupil_id);
+CREATE INDEX IF NOT EXISTS idx_progress_skills_category ON progress_skills(category_id);
 
 -- Teaching Resources
-CREATE INDEX idx_teaching_resources_instructor ON teaching_resources(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_teaching_resources_instructor ON teaching_resources(instructor_id);
 
 -- Activity Logs
-CREATE INDEX idx_activity_logs_instructor ON instructor_activity_logs(instructor_id);
-CREATE INDEX idx_activity_logs_created ON instructor_activity_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_instructor ON instructor_activity_logs(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON instructor_activity_logs(created_at);
 
 -- Instructor Subscriptions
-CREATE INDEX idx_subscriptions_instructor ON instructor_subscriptions(instructor_id);
-CREATE INDEX idx_subscriptions_status ON instructor_subscriptions(status);
-CREATE INDEX idx_subscriptions_active ON instructor_subscriptions(instructor_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_subscriptions_instructor ON instructor_subscriptions(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON instructor_subscriptions(status);
 
 -- Promo Codes
-CREATE INDEX idx_promo_codes_code ON promo_codes(code);
-CREATE INDEX idx_promo_codes_active ON promo_codes(is_active);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_active ON promo_codes(is_active);
 
 -- Locations
-CREATE INDEX idx_locations_instructor ON instructor_locations(instructor_id);
-CREATE INDEX idx_locations_timestamp ON instructor_locations(timestamp);
+CREATE INDEX IF NOT EXISTS idx_locations_instructor ON instructor_locations(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_locations_timestamp ON instructor_locations(timestamp);
 
 -- Payment Requests
-CREATE INDEX idx_payment_requests_instructor ON instructor_payment_requests(instructor_id);
-CREATE INDEX idx_payment_requests_status ON instructor_payment_requests(status);
+CREATE INDEX IF NOT EXISTS idx_payment_requests_instructor ON instructor_payment_requests(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON instructor_payment_requests(status);
+
 
 -- =============================================================
 -- PART 4: TRIGGERS (Auto-update updated_at)
@@ -673,31 +709,34 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Apply to all tables with updated_at
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_pupils_updated_at BEFORE UPDATE ON pupils FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_lessons_updated_at BEFORE UPDATE ON lessons FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_open_slots_updated_at BEFORE UPDATE ON open_slots FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_calendar_events_updated_at BEFORE UPDATE ON calendar_events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_enquiries_updated_at BEFORE UPDATE ON enquiries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_test_reports_updated_at BEFORE UPDATE ON test_reports FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_progress_categories_updated_at BEFORE UPDATE ON progress_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_progress_skills_updated_at BEFORE UPDATE ON progress_skills FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_teaching_resources_updated_at BEFORE UPDATE ON teaching_resources FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_instructor_subscriptions_updated_at BEFORE UPDATE ON instructor_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_pupil_invitations_updated_at BEFORE UPDATE ON pupil_invitations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_pupil_invite_links_updated_at BEFORE UPDATE ON pupil_invite_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_pupil_invite_subs_updated_at BEFORE UPDATE ON pupil_invite_submissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_promo_codes_updated_at BEFORE UPDATE ON promo_codes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_banners_updated_at BEFORE UPDATE ON banners FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_instructor_payment_requests_updated_at BEFORE UPDATE ON instructor_payment_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Apply trigger to every table that has an updated_at column
+DO $$ BEGIN CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_pupils_updated_at BEFORE UPDATE ON pupils FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_lessons_updated_at BEFORE UPDATE ON lessons FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_open_slots_updated_at BEFORE UPDATE ON open_slots FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_calendar_events_updated_at BEFORE UPDATE ON calendar_events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_enquiries_updated_at BEFORE UPDATE ON enquiries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_test_reports_updated_at BEFORE UPDATE ON test_reports FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_progress_categories_updated_at BEFORE UPDATE ON progress_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_progress_skills_updated_at BEFORE UPDATE ON progress_skills FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_teaching_resources_updated_at BEFORE UPDATE ON teaching_resources FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_subscription_plans_updated_at BEFORE UPDATE ON subscription_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_instructor_subscriptions_updated_at BEFORE UPDATE ON instructor_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_pupil_invitations_updated_at BEFORE UPDATE ON pupil_invitations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_pupil_invite_links_updated_at BEFORE UPDATE ON pupil_invite_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_pupil_invite_subs_updated_at BEFORE UPDATE ON pupil_invite_submissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_promo_codes_updated_at BEFORE UPDATE ON promo_codes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_banners_updated_at BEFORE UPDATE ON banners FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_instructor_payment_requests_updated_at BEFORE UPDATE ON instructor_payment_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TRIGGER update_instructor_payments_updated_at BEFORE UPDATE ON instructor_payments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 
 -- =============================================================
 -- PART 5: ROW LEVEL SECURITY (RLS)
@@ -732,8 +771,10 @@ ALTER TABLE banners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instructor_locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instructor_payment_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE instructor_payments ENABLE ROW LEVEL SECURITY;
 
--- Security definer function to check admin role without RLS recursion
+-- Admin helper (avoids RLS recursion)
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE sql SECURITY DEFINER STABLE
@@ -741,184 +782,222 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 $$;
 
+
 -- ---------------------------------------------------------
--- 5.1 PROFILES: Users can read own profile; admins read all
+-- 5.1 PROFILES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "users_read_own_profile" ON profiles;
 CREATE POLICY "users_read_own_profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "users_update_own_profile" ON profiles;
 CREATE POLICY "users_update_own_profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "admins_read_all_profiles" ON profiles;
 CREATE POLICY "admins_read_all_profiles" ON profiles
   FOR SELECT USING (public.is_admin());
 
+DROP POLICY IF EXISTS "insert_own_profile" ON profiles;
 CREATE POLICY "insert_own_profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "instructors_insert_pupil_profiles" ON profiles;
 CREATE POLICY "instructors_insert_pupil_profiles" ON profiles
   FOR INSERT WITH CHECK (
-    role = 'pupil' AND 
+    role = 'pupil' AND
     EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'instructor')
   );
 
 -- ---------------------------------------------------------
--- 5.2 PUPILS: Instructors CRUD own pupils; pupils read own
+-- 5.2 PUPILS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_pupils" ON pupils;
 CREATE POLICY "instructors_manage_pupils" ON pupils
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own" ON pupils;
 CREATE POLICY "pupils_read_own" ON pupils
   FOR SELECT USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "admins_read_all_pupils" ON pupils;
 CREATE POLICY "admins_read_all_pupils" ON pupils
-  FOR SELECT USING (
-    public.is_admin()
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ---------------------------------------------------------
 -- 5.3 INSTRUCTOR-PUPIL LINKS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_links" ON instructor_pupil_links;
 CREATE POLICY "instructors_manage_links" ON instructor_pupil_links
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_links" ON instructor_pupil_links;
 CREATE POLICY "pupils_read_own_links" ON instructor_pupil_links
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
 -- 5.4 PUPIL INVITATIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_invitations" ON pupil_invitations;
 CREATE POLICY "instructors_manage_invitations" ON pupil_invitations
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_invitations" ON pupil_invitations;
 CREATE POLICY "pupils_read_own_invitations" ON pupil_invitations
   FOR SELECT USING (email = (SELECT email FROM profiles WHERE id = auth.uid()));
 
 -- ---------------------------------------------------------
--- 5.4.B PUPIL INVITE LINKS & SUBMISSIONS
+-- 5.5 PUPIL INVITE LINKS & SUBMISSIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_invite_links" ON pupil_invite_links;
 CREATE POLICY "instructors_manage_invite_links" ON pupil_invite_links
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "public_read_invite_links" ON pupil_invite_links;
 CREATE POLICY "public_read_invite_links" ON pupil_invite_links
-  FOR SELECT USING (true); -- allowed for web portal lookup
+  FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "instructors_manage_invite_submissions" ON pupil_invite_submissions;
 CREATE POLICY "instructors_manage_invite_submissions" ON pupil_invite_submissions
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "public_insert_submissions" ON pupil_invite_submissions;
 CREATE POLICY "public_insert_submissions" ON pupil_invite_submissions
-  FOR INSERT WITH CHECK (true); -- Web portal form
+  FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "public_read_own_submissions" ON pupil_invite_submissions;
 CREATE POLICY "public_read_own_submissions" ON pupil_invite_submissions
-  FOR SELECT USING (true); -- Web portal uses query filters (pupil_token)
+  FOR SELECT USING (true);
 
 -- ---------------------------------------------------------
--- 5.5 LESSONS
+-- 5.6 LESSONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_lessons" ON lessons;
 CREATE POLICY "instructors_manage_lessons" ON lessons
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_lessons" ON lessons;
 CREATE POLICY "pupils_read_own_lessons" ON lessons
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.6 OPEN SLOTS
+-- 5.7 OPEN SLOTS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_slots" ON open_slots;
 CREATE POLICY "instructors_manage_slots" ON open_slots
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_available_slots" ON open_slots;
 CREATE POLICY "pupils_read_available_slots" ON open_slots
   FOR SELECT USING (is_booked = false AND status = 'confirmed');
 
 -- ---------------------------------------------------------
--- 5.7 CALENDAR EVENTS
+-- 5.8 CALENDAR EVENTS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_events" ON calendar_events;
 CREATE POLICY "instructors_manage_events" ON calendar_events
   FOR ALL USING (instructor_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.8 TRANSACTIONS
+-- 5.9 TRANSACTIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_transactions" ON transactions;
 CREATE POLICY "instructors_manage_transactions" ON transactions
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_transactions" ON transactions;
 CREATE POLICY "pupils_read_own_transactions" ON transactions
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.9 INVOICES
+-- 5.10 INVOICES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_invoices" ON invoices;
 CREATE POLICY "instructors_manage_invoices" ON invoices
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_invoices" ON invoices;
 CREATE POLICY "pupils_read_own_invoices" ON invoices
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.10 MESSAGES
+-- 5.11 MESSAGES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "users_manage_own_messages" ON messages;
 CREATE POLICY "users_manage_own_messages" ON messages
   FOR ALL USING (auth.uid() IN (sender_id, receiver_id));
 
 -- ---------------------------------------------------------
--- 5.11 NOTIFICATIONS
+-- 5.12 NOTIFICATIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "users_manage_own_notifications" ON app_notifications;
 CREATE POLICY "users_manage_own_notifications" ON app_notifications
   FOR ALL USING (user_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.12 ENQUIRIES
+-- 5.13 ENQUIRIES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_enquiries" ON enquiries;
 CREATE POLICY "instructors_manage_enquiries" ON enquiries
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_enquiries" ON enquiries;
 CREATE POLICY "pupils_read_own_enquiries" ON enquiries
   FOR SELECT USING (email = (SELECT email FROM profiles WHERE id = auth.uid()));
 
 -- ---------------------------------------------------------
--- 5.13 TEST REPORTS
+-- 5.14 TEST REPORTS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_test_reports" ON test_reports;
 CREATE POLICY "instructors_manage_test_reports" ON test_reports
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_own_test_reports" ON test_reports;
 CREATE POLICY "pupils_read_own_test_reports" ON test_reports
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.14 MILEAGE
+-- 5.15 MILEAGE
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_mileage" ON mileage_entries;
 CREATE POLICY "instructors_manage_mileage" ON mileage_entries
   FOR ALL USING (instructor_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.15 VEHICLES
+-- 5.16 VEHICLES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_vehicles" ON vehicles;
 CREATE POLICY "instructors_manage_vehicles" ON vehicles
   FOR ALL USING (instructor_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.16 PROGRESS CATEGORIES
+-- 5.17 PROGRESS CATEGORIES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_progress_categories" ON progress_categories;
 CREATE POLICY "instructors_manage_progress_categories" ON progress_categories
   FOR ALL USING (instructor_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.17 PROGRESS SKILLS
+-- 5.18 PROGRESS SKILLS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_progress_skills" ON progress_skills;
 CREATE POLICY "instructors_manage_progress_skills" ON progress_skills
   FOR ALL USING (
     EXISTS (SELECT 1 FROM progress_categories WHERE id = category_id AND instructor_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "pupils_read_own_progress" ON progress_skills;
 CREATE POLICY "pupils_read_own_progress" ON progress_skills
   FOR SELECT USING (pupil_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.18 TEACHING RESOURCES
+-- 5.19 TEACHING RESOURCES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_resources" ON teaching_resources;
 CREATE POLICY "instructors_manage_resources" ON teaching_resources
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "pupils_read_public_resources" ON teaching_resources;
 CREATE POLICY "pupils_read_public_resources" ON teaching_resources
   FOR SELECT USING (
     visibility = 'public'
@@ -926,106 +1005,133 @@ CREATE POLICY "pupils_read_public_resources" ON teaching_resources
   );
 
 -- ---------------------------------------------------------
--- 5.19 ACTIVITY LOGS
+-- 5.20 ACTIVITY LOGS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_read_own_logs" ON instructor_activity_logs;
 CREATE POLICY "instructors_read_own_logs" ON instructor_activity_logs
   FOR SELECT USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "instructors_insert_logs" ON instructor_activity_logs;
 CREATE POLICY "instructors_insert_logs" ON instructor_activity_logs
   FOR INSERT WITH CHECK (instructor_id = auth.uid());
 
 -- ---------------------------------------------------------
--- 5.20 SUBSCRIPTIONS
+-- 5.21 SUBSCRIPTIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_read_own_subscription" ON instructor_subscriptions;
 CREATE POLICY "instructors_read_own_subscription" ON instructor_subscriptions
   FOR SELECT USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "instructors_insert_own_subscription" ON instructor_subscriptions;
 CREATE POLICY "instructors_insert_own_subscription" ON instructor_subscriptions
   FOR INSERT WITH CHECK (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "admins_manage_subscriptions" ON instructor_subscriptions;
 CREATE POLICY "admins_manage_subscriptions" ON instructor_subscriptions
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.21 SUBSCRIPTION PLANS (public read, admin write)
+-- 5.22 SUBSCRIPTION PLANS (public read, admin write)
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "anyone_read_plans" ON subscription_plans;
 CREATE POLICY "anyone_read_plans" ON subscription_plans
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "admins_manage_plans" ON subscription_plans;
 CREATE POLICY "admins_manage_plans" ON subscription_plans
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.22 PROMO CODES
+-- 5.23 PROMO CODES
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "admins_manage_promo_codes" ON promo_codes;
 CREATE POLICY "admins_manage_promo_codes" ON promo_codes
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.23 BANNERS (public read, admin write)
+-- 5.24 BANNERS (public read, admin write)
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "anyone_read_banners" ON banners;
 CREATE POLICY "anyone_read_banners" ON banners
   FOR SELECT USING (is_active = true);
 
+DROP POLICY IF EXISTS "admins_manage_banners" ON banners;
 CREATE POLICY "admins_manage_banners" ON banners
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.24 APP SETTINGS
+-- 5.25 APP SETTINGS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "admins_manage_app_settings" ON app_settings;
 CREATE POLICY "admins_manage_app_settings" ON app_settings
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.25 INSTRUCTOR LOCATIONS
+-- 5.26 INSTRUCTOR LOCATIONS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_own_locations" ON instructor_locations;
 CREATE POLICY "instructors_manage_own_locations" ON instructor_locations
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "admins_read_locations" ON instructor_locations;
 CREATE POLICY "admins_read_locations" ON instructor_locations
-  FOR SELECT USING (
-    public.is_admin()
-  );
+  FOR SELECT USING (public.is_admin());
 
 -- ---------------------------------------------------------
--- 5.26 PAYMENT REQUESTS
+-- 5.27 PAYMENT REQUESTS
 -- ---------------------------------------------------------
+DROP POLICY IF EXISTS "instructors_manage_own_requests" ON instructor_payment_requests;
 CREATE POLICY "instructors_manage_own_requests" ON instructor_payment_requests
   FOR ALL USING (instructor_id = auth.uid());
 
+DROP POLICY IF EXISTS "admins_manage_payment_requests" ON instructor_payment_requests;
 CREATE POLICY "admins_manage_payment_requests" ON instructor_payment_requests
-  FOR ALL USING (
-    public.is_admin()
-  );
+  FOR ALL USING (public.is_admin());
+
+-- ---------------------------------------------------------
+-- 5.28 EVENTS
+-- ---------------------------------------------------------
+DROP POLICY IF EXISTS "anyone_read_published_events" ON events;
+CREATE POLICY "anyone_read_published_events" ON events
+  FOR SELECT USING (is_published = true);
+
+DROP POLICY IF EXISTS "admins_manage_events" ON events;
+CREATE POLICY "admins_manage_events" ON events
+  FOR ALL USING (public.is_admin());
+
+-- ---------------------------------------------------------
+-- 5.29 INSTRUCTOR PAYMENTS
+-- ---------------------------------------------------------
+DROP POLICY IF EXISTS "admins_manage_instructor_payments" ON instructor_payments;
+CREATE POLICY "admins_manage_instructor_payments" ON instructor_payments
+  FOR ALL USING (public.is_admin());
+
+DROP POLICY IF EXISTS "instructors_view_own_payments" ON instructor_payments;
+CREATE POLICY "instructors_view_own_payments" ON instructor_payments
+  FOR SELECT USING (instructor_id = auth.uid());
+
 
 -- =============================================================
 -- PART 6: SEED DATA
 -- =============================================================
 
--- Default subscription plans
+-- Default subscription plans (upsert-safe with ON CONFLICT)
 INSERT INTO subscription_plans (name, price, duration_months, features, is_free_tier, is_active, sort_order) VALUES
-  ('Free Trial', 0, 2, '["Up to 5 pupils", "Basic diary", "Manual payment tracking"]', true, true, 0),
-  ('Starter', 9.99, 1, '["Up to 10 pupils", "Smart diary", "Payment tracking", "Pupil messaging"]', false, true, 1),
-  ('Professional', 19.99, 1, '["Unlimited pupils", "Smart diary with slots", "Full financial reports", "Pupil messaging & portal", "Progress tracking", "Test reports"]', false, true, 2),
-  ('Premium', 29.99, 1, '["Everything in Professional", "Online booking", "Route planning", "Priority support", "Custom branding", "API access", "Multi-instructor support"]', false, true, 3);
+  ('Free Trial',    0,     2, '["Up to 5 pupils","Basic diary","Manual payment tracking"]', true,  true, 0),
+  ('Starter',       9.99,  1, '["Up to 10 pupils","Smart diary","Payment tracking","Pupil messaging"]', false, true, 1),
+  ('Professional', 19.99,  1, '["Unlimited pupils","Smart diary with slots","Full financial reports","Pupil messaging & portal","Progress tracking","Test reports"]', false, true, 2),
+  ('Premium',      29.99,  1, '["Everything in Professional","Online booking","Route planning","Priority support","Custom branding","API access","Multi-instructor support"]', false, true, 3)
+ON CONFLICT DO NOTHING;
 
 -- Default app settings
 INSERT INTO app_settings (key, value) VALUES
-  ('platform_name', '"Lesson Tracker Pro"'),
+  ('platform_name',           '"Lesson Tracker Pro"'),
   ('platform_fee_percentage', '2.9'),
-  ('free_trial_days', '60'),
-  ('default_currency', '"GBP"'),
-  ('support_email', '"support@lessontrackerpro.com"');
+  ('free_trial_days',         '60'),
+  ('default_currency',        '"GBP"'),
+  ('support_email',           '"support@lessontrackerpro.com"')
+ON CONFLICT (key) DO NOTHING;
+
 
 -- =============================================================
 -- PART 7: AUTH TRIGGER (Auto-create profile on signup)
@@ -1035,16 +1141,29 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
+DECLARE
+  role_val TEXT;
+  invite_token TEXT;
 BEGIN
+  role_val := COALESCE(NEW.raw_user_meta_data->>'role', 'instructor');
+
   INSERT INTO public.profiles (id, full_name, email, phone, role, email_verified)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
     COALESCE(NEW.email, ''),
     COALESCE(NEW.raw_user_meta_data->>'phone', ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'instructor'),
+    role_val,
     FALSE
   );
+
+  -- Auto-create a permanent invite link for instructors
+  IF role_val = 'instructor' THEN
+    invite_token := encode(gen_random_bytes(12), 'hex');
+    INSERT INTO public.pupil_invite_links (instructor_id, token, is_active)
+    VALUES (NEW.id, invite_token, true);
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -1054,6 +1173,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+
 -- =============================================================
--- SCHEMA COMPLETE
+-- SCHEMA COMPLETE ✅
 -- =============================================================

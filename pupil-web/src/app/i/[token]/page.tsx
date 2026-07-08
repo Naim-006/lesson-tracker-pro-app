@@ -66,19 +66,19 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
 
       if (linkErr || !link) {
         console.error('Invite link lookup failed:', { token, error: linkErr, link });
-        setError('This invite link is invalid or has expired.');
+        setError('This invite link is invalid. Please ask your driving instructor to share their invite link from the Pupil Registration section of their app.');
         setLoading(false);
         return;
       }
 
       if (!link.is_active) {
-        setError('This invite link is no longer active.');
+        setError('This invite link is no longer active. Please contact your instructor for a new one.');
         setLoading(false);
         return;
       }
 
       if (link.expires_at && new Date(link.expires_at) < new Date()) {
-        setError('This invite link has expired.');
+        setError('This invite link has expired. Please ask your instructor for a new one.');
         setLoading(false);
         return;
       }

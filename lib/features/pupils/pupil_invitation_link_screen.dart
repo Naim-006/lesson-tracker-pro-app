@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,6 @@ class PupilInvitationLinkScreen extends ConsumerStatefulWidget {
 class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkScreen> {
   String? _linkToken;
   bool _isLoading = true;
-  bool _isCreating = false;
   List<Map<String, dynamic>> _submissions = [];
   int _pendingCount = 0;
   int _approvedCount = 0;
@@ -29,12 +29,17 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     _loadLink();
   }
 
+  String _getAppBaseUrl() {
+    return const String.fromEnvironment('INVITE_BASE_URL',
+        defaultValue: 'https://lessontrackerpro.vercel.app');
+  }
+
   Future<void> _loadLink() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      final linkResult = await Supabase.instance.client
+      var linkResult = await Supabase.instance.client
           .from('pupil_invite_links')
           .select('id, token, is_active')
           .eq('instructor_id', user.id)
@@ -43,19 +48,19 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
           .maybeSingle();
 
       if (linkResult == null) {
-        await _ensureLinkExists(user.id);
-        if (mounted) {
-          setState(() => _isLoading = false);
-          _loadLink();
-        }
-        return;
-      }
-
-      if (linkResult['is_active'] != true) {
-        await Supabase.instance.client
+        final token = _generateToken();
+        await Supabase.instance.client.from('pupil_invite_links').insert({
+          'instructor_id': user.id,
+          'token': token,
+          'is_active': true,
+        });
+        linkResult = await Supabase.instance.client
             .from('pupil_invite_links')
-            .update({ 'is_active': true, 'expires_at': null })
-            .eq('id', linkResult['id']);
+            .select('id, token, is_active')
+            .eq('instructor_id', user.id)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
       }
 
       final subsResult = await Supabase.instance.client
@@ -79,36 +84,6 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _ensureLinkExists(String instructorId) async {
-    try {
-      final token = _generateToken();
-      await Supabase.instance.client.from('pupil_invite_links').insert({
-        'instructor_id': instructorId,
-        'token': token,
-        'is_active': true,
-        'expires_at': null,
-      });
-      if (mounted) {
-        setState(() => _linkToken = token);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating link: $e'), backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
-
-  String _generateToken() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-    final random = DateTime.now().microsecondsSinceEpoch;
-    return List.generate(12, (i) {
-      final idx = ((random * (i + 1) * 997) % chars.length).abs();
-      return chars[idx];
-    }).join();
   }
 
   Future<void> _reviewSubmission(String id, String action, {String? notes}) async {
@@ -172,7 +147,13 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     }
   }
 
-  String _getInviteUrl() => 'https://lessontrackerpro.vercel.app/i/$_linkToken';
+  String _generateToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    final rng = Random();
+    return List.generate(16, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  String _getInviteUrl() => '${_getAppBaseUrl()}/i/$_linkToken';
 
   @override
   Widget build(BuildContext context) {
@@ -185,24 +166,16 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
         backgroundColor: isDark ? AppColors.darkCard : Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          if (_linkToken != null)
-            IconButton(
-              icon: const Icon(Icons.open_in_browser),
-              onPressed: () => _showWebDashboard(),
-              tooltip: 'Open Web Dashboard',
-            ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _linkToken == null
-              ? _buildCreateLinkView(isDark)
+              ? _buildNoLinkView(isDark)
               : _buildLinkView(isDark),
     );
   }
 
-  Widget _buildCreateLinkView(bool isDark) {
+  Widget _buildNoLinkView(bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -217,11 +190,11 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.link, color: AppColors.sunsetBright, size: 48),
+              child: Icon(Icons.link_off, color: AppColors.sunsetBright, size: 48),
             ),
             const SizedBox(height: 24),
             Text(
-              'Create Your Invite Link',
+              'No Invite Link Found',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -230,7 +203,7 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
             ),
             const SizedBox(height: 8),
             Text(
-              'Generate a unique link that pupils can use to register.\nYou review and approve each registration.',
+              'Your permanent invite link is being created.\nPlease pull down to refresh or check back shortly.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -240,14 +213,11 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isCreating ? null : _createLink,
-                icon: _isCreating
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.add_link),
-                label: Text(_isCreating ? 'Creating...' : 'Generate Invite Link'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.sunsetBright,
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() { _isLoading = true; _loadLink(); }),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
