@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { submitFormSchema } from '@/lib/validators';
 
 export async function POST(req: NextRequest) {
@@ -19,8 +19,6 @@ export async function POST(req: NextRequest) {
       pickup_location, dropoff_location, preferred_days, preferred_times,
       learning_goals, experience_level, emergency_contact_name, emergency_contact_phone, notes
     } = zodResult.data;
-
-    const supabase = getSupabaseAdmin();
 
     // Validate invite link
     const { data: link, error: linkErr } = await supabase

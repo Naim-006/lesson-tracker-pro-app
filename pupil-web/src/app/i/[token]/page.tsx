@@ -65,6 +65,7 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
         .single();
 
       if (linkErr || !link) {
+        console.error('Invite link lookup failed:', { token, error: linkErr, link });
         setError('This invite link is invalid or has expired.');
         setLoading(false);
         return;

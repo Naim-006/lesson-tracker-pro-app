@@ -38,12 +38,24 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
           .from('pupil_invite_links')
           .select('id, token, is_active')
           .eq('instructor_id', user.id)
-          .eq('is_active', true)
+          .order('created_at', ascending: false)
+          .limit(1)
           .maybeSingle();
 
       if (linkResult == null) {
-        if (mounted) setState(() => _isLoading = false);
+        await _ensureLinkExists(user.id);
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _loadLink();
+        }
         return;
+      }
+
+      if (linkResult['is_active'] != true) {
+        await Supabase.instance.client
+            .from('pupil_invite_links')
+            .update({ 'is_active': true, 'expires_at': null })
+            .eq('id', linkResult['id']);
       }
 
       final subsResult = await Supabase.instance.client
@@ -69,36 +81,48 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     }
   }
 
-  Future<void> _createLink() async {
-    setState(() => _isCreating = true);
+  Future<void> _ensureLinkExists(String instructorId) async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-
-      final chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-      final token = List.generate(12, (_) => chars[(chars.length * (DateTime.now().millisecond % 1000) / 1000).floor() % chars.length]).join();
-
+      final token = _generateToken();
       await Supabase.instance.client.from('pupil_invite_links').insert({
-        'instructor_id': user.id,
+        'instructor_id': instructorId,
         'token': token,
+        'is_active': true,
+        'expires_at': null,
       });
-
-      setState(() => _isCreating = false);
-      await _loadLink();
+      if (mounted) {
+        setState(() => _linkToken = token);
+      }
     } catch (e) {
       if (mounted) {
-        setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Error creating link: $e'), backgroundColor: AppColors.error),
         );
       }
     }
+  }
+
+  String _generateToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    final random = DateTime.now().microsecondsSinceEpoch;
+    return List.generate(12, (i) {
+      final idx = ((random * (i + 1) * 997) % chars.length).abs();
+      return chars[idx];
+    }).join();
   }
 
   Future<void> _reviewSubmission(String id, String action, {String? notes}) async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
+
+      final submissionData = action == 'approve'
+          ? await Supabase.instance.client
+              .from('pupil_invite_submissions')
+              .select('email, first_name, last_name, phone')
+              .eq('id', id)
+              .single()
+          : null;
 
       await Supabase.instance.client
           .from('pupil_invite_submissions')
@@ -109,10 +133,31 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
           })
           .eq('id', id);
 
+      if (action == 'approve' && submissionData != null) {
+        final existingInvitation = await Supabase.instance.client
+            .from('pupil_invitations')
+            .select('id')
+            .eq('email', submissionData['email'])
+            .eq('instructor_id', user.id)
+            .maybeSingle();
+
+        if (existingInvitation == null) {
+          await Supabase.instance.client.from('pupil_invitations').insert({
+            'instructor_id': user.id,
+            'email': submissionData['email'],
+            'first_name': submissionData['first_name'] ?? '',
+            'last_name': submissionData['last_name'] ?? '',
+            'phone': submissionData['phone'] ?? '',
+            'status': 'approved',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(action == 'approve' ? 'Approved! Pupil will be created.' : 'Rejected.'),
+            content: Text(action == 'approve' ? 'Approved! Pupil will be invited to sign up.' : 'Rejected.'),
             backgroundColor: action == 'approve' ? AppColors.success : AppColors.error,
           ),
         );
