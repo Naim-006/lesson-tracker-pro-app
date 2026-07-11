@@ -33,19 +33,15 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
           .eq('status', 'active')
           .maybeSingle();
 
-      if (linkRes == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+      if (linkRes == null) { if (mounted) setState(() => _isLoading = false); return; }
 
       final instructorId = linkRes['instructor_id'] as String;
       final instructor = await Supabase.instance.client
           .from('profiles')
-          .select('full_name, avatar_url, business_name')
+          .select('full_name, avatar_url, business_name, phone')
           .eq('id', instructorId)
           .maybeSingle();
 
-      // Fetch last message with this instructor
       final lastMsg = await Supabase.instance.client
           .from('messages')
           .select('content, created_at')
@@ -56,28 +52,21 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
 
       if (mounted) {
         setState(() {
-          _instructor = instructor;
+          _instructor = instructor ?? {'full_name': 'Your Instructor'};
           _instructor!['id'] = instructorId;
           _lastMessage = lastMsg?['content']?.toString();
           _isLoading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) { if (mounted) setState(() => _isLoading = false); }
   }
 
   void _openChat() {
     if (_instructor == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          pupilId: _instructor!['id'],
-          pupilName: _instructor!['full_name'] ?? 'Instructor',
-        ),
-      ),
-    ).then((_) => _load());
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
+      pupilId: _instructor!['id'],
+      pupilName: _instructor!['full_name'] ?? 'Instructor',
+    ))).then((_) => _load());
   }
 
   @override
@@ -89,122 +78,100 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
         title: const Text('Messages'),
         backgroundColor: AppColors.sunsetBright,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
           : _instructor == null
-              ? Center(
+              ? Center(child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_off_rounded, size: 72, color: Colors.grey.shade300),
+                    const SizedBox(height: 16),
+                    Text('Could not load messages', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(onPressed: _load, icon: const Icon(Icons.refresh, size: 18), label: const Text('Retry')),
+                  ],
+                ))
+              : Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.cloud_off_rounded, size: 72, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        Text('Could not load messages', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
-                        const SizedBox(height: 16),
-                        FilledButton.tonalIcon(
-                          onPressed: _load,
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('Retry'),
+                        Container(
+                          width: 88, height: 88,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8))],
+                          ),
+                          child: Center(
+                            child: Text(
+                              (_instructor!['full_name'] as String? ?? '?')[0].toUpperCase(),
+                              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(_instructor!['full_name'] ?? 'Your Instructor', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                        if (_instructor!['business_name'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(_instructor!['business_name'], style: TextStyle(fontSize: 14, color: AppColors.sunsetBright, fontWeight: FontWeight.w600)),
+                          ),
+                        const SizedBox(height: 8),
+                        Text('Your Driving Instructor', style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.darkCard : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                                    child: const Icon(Icons.chat_rounded, color: AppColors.sunsetBright, size: 22),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Chat with Instructor', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                                        Text(_lastMessage ?? 'Tap to start chatting', style: TextStyle(fontSize: 12, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _openChat,
+                                  icon: const Icon(Icons.chat_rounded, size: 20),
+                                  label: const Text('Open Chat'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.sunsetBright,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                )
-              : Column(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6))],
-                      ),
-                      child: InkWell(
-                        onTap: _openChat,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56, height: 56,
-                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
-                              child: Center(
-                                child: Text(
-                                  (_instructor!['full_name'] as String? ?? '?')[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(_instructor!['full_name'] ?? 'Your Instructor',
-                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _lastMessage ?? 'Tap to start chatting',
-                                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.white.withValues(alpha: 0.7)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkCard : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, width: 0.5),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.info_outline, color: AppColors.sunsetBright, size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              const Text('Chat with your instructor', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text('Send messages to your instructor about lessons, scheduling, or any questions.',
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: _openChat,
-                              icon: const Icon(Icons.chat_rounded, size: 18),
-                              label: const Text('Open Chat'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.sunsetBright,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
     );
   }
