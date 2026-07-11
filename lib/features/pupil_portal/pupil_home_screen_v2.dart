@@ -9,6 +9,7 @@ import 'slot_request_screen.dart';
 import 'pupil_progress_screen.dart';
 import 'pupil_test_reports_screen.dart';
 import 'pupil_messaging_screen.dart';
+import 'pupil_lessons_screen.dart';
 
 class PupilHomeScreenV2 extends ConsumerStatefulWidget {
   const PupilHomeScreenV2({super.key});
@@ -85,6 +86,7 @@ class _PupilHomeScreenV2State extends ConsumerState<PupilHomeScreenV2> {
                           SliverToBoxAdapter(child: _buildHero(isDark, profile, instructor)),
                           SliverToBoxAdapter(child: _buildStatRow(isDark, upcomingLessons, progress, totalHours)),
                           SliverToBoxAdapter(child: _buildUpcomingLesson(isDark, upcomingLessons)),
+                          SliverToBoxAdapter(child: _buildSeeAllLessons(isDark)),
                           SliverToBoxAdapter(child: _buildQuickActions(isDark)),
                           SliverToBoxAdapter(child: _buildProgressSnapshot(isDark, progressSkills, progress)),
                           if (instructor != null)
@@ -314,6 +316,23 @@ class _PupilHomeScreenV2State extends ConsumerState<PupilHomeScreenV2> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSeeAllLessons(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilLessonsScreen())),
+            icon: const Icon(Icons.calendar_month_outlined, size: 16),
+            label: const Text('View all lessons'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.sunsetBright),
+          ),
+        ],
       ),
     );
   }
