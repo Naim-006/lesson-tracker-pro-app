@@ -64,10 +64,12 @@ class UpcomingTestsScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final report = upcomingTests[index];
                 final pupilData = report['pupils'];
-                final profile = pupilData?['profiles'];
                 final testDate = DateTime.parse(report['test_date']);
-                final pupilName = profile?['full_name'] ?? 'Unknown';
-                final firstName = pupilName.split(' ').first;
+                final String pupilName = pupilData != null
+                    ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+                    : 'Unknown';
+                final String resolvedName = pupilName.isNotEmpty ? pupilName : 'Unknown';
+                final firstName = resolvedName.split(' ').first;
                 final daysUntil = testDate.difference(DateTime.now()).inDays;
                 
                 return Container(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 import { submitFormSchema } from '@/lib/validators';
 
 export async function POST(req: NextRequest) {
@@ -52,6 +52,37 @@ export async function POST(req: NextRequest) {
         error: 'Already registered',
         status: existing.status,
         pupil_token: null,
+      }, { status: 409 });
+    }
+
+    // Check if email already exists (as pupil record or auth account)
+    const admin = getSupabaseAdmin();
+    const emailLower = email.toLowerCase();
+
+    const { data: existingProfile } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('email', emailLower)
+      .eq('role', 'pupil')
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json({
+        error: 'This email is already registered. Please sign in to your account instead.',
+      }, { status: 409 });
+    }
+
+    const { data: activeLink } = await admin
+      .from('instructor_pupil_links')
+      .select('id, pupils!inner(instructor_id, email)')
+      .eq('pupils.instructor_id', link.instructor_id)
+      .eq('pupils.email', emailLower)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (activeLink) {
+      return NextResponse.json({
+        error: 'This email is already associated with a pupil. Please contact your instructor if you need to regain access.',
       }, { status: 409 });
     }
 

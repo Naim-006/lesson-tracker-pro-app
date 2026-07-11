@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
+import '../../core/services/geocoding_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/avatar_circle.dart';
 import '../../core/widgets/loading_shimmer.dart';
 import '../../core/utils/route_transitions.dart';
+import '../diary/lesson_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../settings/teaching_resources_screen.dart';
 import '../test_reports/test_reports_screen.dart';
@@ -73,6 +76,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 'no_show': return LessonStatus.noShow;
       default: return LessonStatus.scheduled;
     }
+  }
+
+  Future<void> _openInMaps(String query) async {
+    final uri = Uri.parse(GeocodingService.googleMapsQueryUrl(query));
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _showLessonDetail(Lesson lesson) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LessonDetailScreen(lesson: lesson),
+      ),
+    );
   }
 
   @override
@@ -317,11 +334,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<Lesson> _parseLessons(AsyncValue<List<Map<String, dynamic>>> asyncValue) {
     return asyncValue.valueOrNull?.map((l) {
       final pupilData = l['pupils'];
-      final profile = pupilData?['profiles'];
+      final String pupilName = pupilData != null
+          ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+          : 'Unknown';
       return Lesson(
         id: l['id'],
         pupilId: l['pupil_id'],
-        pupilName: profile?['full_name'] ?? 'Unknown',
+        pupilName: pupilName.isNotEmpty ? pupilName : 'Unknown',
         date: DateTime.parse(l['date']),
         time: l['time'] ?? '',
         duration: l['duration'] ?? 60,
@@ -409,233 +428,409 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final initials = lesson.pupilName.isNotEmpty
         ? lesson.pupilName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join()
         : '?';
+    final hasLocation = lesson.pickupLocation != null && lesson.pickupLocation!.isNotEmpty;
+    final mapUrl = hasLocation ? GeocodingService.staticMapUrl(lesson.pickupLocation!, width: 800, height: 300, zoom: 15) : null;
 
-    return AppCard(
-      variant: CardVariant.gradient,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      gradient: LinearGradient(
-        colors: isDark
-            ? [AppColors.darkCard, AppColors.darkCardElevated]
-            : [AppColors.sunsetBright, AppColors.sunset],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: 24,
-      contentPadding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'UP NEXT',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: GestureDetector(
+        onTap: () => _showLessonDetail(lesson),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: isDark ? AppColors.darkCard : Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
               ),
-              const Spacer(),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
+          child: Column(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+              // Map section
+              if (hasLocation)
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    height: 150,
+                    width: double.infinity,
+                    child: Image.network(
+                      mapUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, progress) {
+                        if (progress == null) return child;
+                        return _mapPlaceholder(isDark);
+                      },
+                      errorBuilder: (_, __, ___) => _mapPlaceholder(isDark),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+                )
+              else
+                _mapPlaceholder(isDark),
+              // Content section
+              Padding(
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      lesson.pupilName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.sunsetBright.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.navigation, size: 12, color: AppColors.sunsetBright),
+                              const SizedBox(width: 4),
+                              Text(
+                                'UP NEXT',
+                                style: TextStyle(
+                                  color: AppColors.sunsetBright,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        if (lesson.rate > 0)
+                          Text(
+                            '\u00a3${lesson.rate.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              color: AppColors.sunsetBright,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_formatTime(lesson.time)} - ${_calculateEndTime(lesson.time, lesson.duration)}',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 13,
-                      ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Container(
+                          width: 44, height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.sunsetBright.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              initials,
+                              style: TextStyle(
+                                color: AppColors.sunsetBright,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lesson.pupilName,
+                                style: TextStyle(
+                                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(Icons.access_time, size: 12,
+                                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${_formatTime(lesson.time)} - ${_calculateEndTime(lesson.time, lesson.duration)}',
+                                    style: TextStyle(
+                                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, size: 20,
+                            color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                      ],
                     ),
+                    if (hasLocation || (lesson.dropoffLocation != null && lesson.dropoffLocation!.isNotEmpty)) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (isDark ? AppColors.darkBorder : AppColors.lightBorder).withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            if (hasLocation)
+                              _buildMapStop(Icons.trip_origin, lesson.pickupLocation!, isDark, isFirst: true),
+                            if (lesson.dropoffLocation != null && lesson.dropoffLocation!.isNotEmpty)
+                              _buildMapStop(Icons.location_on, lesson.dropoffLocation!, isDark, isLast: true),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (lesson.rate > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '\u00a3${lesson.rate.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _mapPlaceholder(bool isDark) {
+    return Container(
+      height: 150,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2A3A) : const Color(0xFFE8F0FE),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.map_outlined, size: 36,
+                color: isDark ? AppColors.darkMuted : const Color(0xFF9AA0A6)),
+            const SizedBox(height: 8),
+            Text(
+              'No location set',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.darkMuted : const Color(0xFF9AA0A6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapStop(IconData icon, String label, bool isDark, {bool isFirst = false, bool isLast = false}) {
+    return Padding(
+      padding: EdgeInsets.only(top: isFirst ? 0 : 6),
+      child: GestureDetector(
+        onTap: () => _openInMaps(label),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: AppColors.sunsetBright),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                  fontWeight: FontWeight.w500,
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (lesson.pickupLocation != null && lesson.pickupLocation!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.trip_origin, size: 14, color: Colors.white.withValues(alpha: 0.7)),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      lesson.pickupLocation!,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
-                    ),
-                  ),
-                ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          if (lesson.dropoffLocation != null && lesson.dropoffLocation!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.location_on, size: 14, color: Colors.white.withValues(alpha: 0.7)),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      lesson.dropoffLocation!,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 14, color: Colors.white.withValues(alpha: 0.7)),
-              const SizedBox(width: 4),
-              Text(
-                _formatDuration(lesson.duration),
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
-              ),
-            ],
-          ),
-        ],
+            Icon(Icons.map, size: 12, color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildLessonCard(_TimelineLesson item, bool isDark) {
     final lesson = item.lesson;
-    final initials = lesson.pupilName.isNotEmpty
-        ? lesson.pupilName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join()
-        : '?';
+    final statusColor = lesson.status == LessonStatus.completed
+        ? AppColors.success
+        : lesson.status == LessonStatus.cancelled
+            ? AppColors.error
+            : lesson.status == LessonStatus.noShow
+                ? AppColors.warning
+                : AppColors.sunsetBright;
+    final hasLocation = lesson.pickupLocation != null && lesson.pickupLocation!.isNotEmpty;
+    final mapUrl = hasLocation ? GeocodingService.staticMapUrl(lesson.pickupLocation!, width: 300, height: 300, zoom: 15) : null;
 
-    return AppCard(
-      variant: CardVariant.outlined,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      onTap: () {},
-      child: Row(
-        children: [
-          AvatarCircle(initials: initials, size: 48),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lesson.pupilName,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_formatTime(lesson.time)} - ${_calculateEndTime(lesson.time, lesson.duration)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
-                  ),
-                ),
-                if (lesson.pickupLocation != null && lesson.pickupLocation!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    lesson.pickupLocation!,
-                    style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: () => _showLessonDetail(lesson),
+            borderRadius: BorderRadius.circular(16),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Map thumbnail on left
+                  if (hasLocation)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                      child: SizedBox(
+                        width: 100,
+                        child: Image.network(
+                          mapUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (ctx, child, progress) {
+                            if (progress == null) return child;
+                            return Container(color: isDark ? const Color(0xFF1E2A3A) : const Color(0xFFE8F0FE));
+                          },
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: isDark ? const Color(0xFF1E2A3A) : const Color(0xFFE8F0FE)),
+                        ),
+                      ),
+                    ),
+                  // Content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  lesson.pupilName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                                  ),
+                                ),
+                              ),
+                              if (lesson.status != LessonStatus.scheduled)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    lesson.status.name.toUpperCase(),
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.access_time, size: 11,
+                                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '${_formatTime(lesson.time)} - ${_calculateEndTime(lesson.time, lesson.duration)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          if (lesson.pickupLocation != null && lesson.pickupLocation!.isNotEmpty)
+                            _buildCardStop(Icons.trip_origin, lesson.pickupLocation!, isDark),
+                          if (lesson.dropoffLocation != null && lesson.dropoffLocation!.isNotEmpty)
+                            _buildCardStop(Icons.location_on, lesson.dropoffLocation!, isDark),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (lesson.rate > 0)
+                                Text(
+                                  '\u00a3${lesson.rate.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    color: lesson.paid ? AppColors.success : AppColors.sunsetBright,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              if (lesson.paid) ...[
+                                const SizedBox(width: 6),
+                                Icon(Icons.check_circle, size: 12, color: AppColors.success),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'PAID',
+                                  style: TextStyle(
+                                    color: AppColors.success,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              Icon(Icons.chevron_right, size: 16,
+                                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardStop(IconData icon, String label, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: GestureDetector(
+        onTap: () => _openInMaps(label),
+        child: Row(
+          children: [
+            Icon(icon, size: 11, color: AppColors.sunsetBright),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
                 ),
-                child: Text(
-                  _formatDuration(lesson.duration),
-                  style: const TextStyle(
-                    color: AppColors.sunsetBright,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              if (lesson.rate > 0) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '\u00a3${lesson.rate.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
+            ),
+            Icon(Icons.map, size: 9, color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+          ],
+        ),
       ),
     );
   }

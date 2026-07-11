@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/csv_export.dart';
+import '../../core/utils/transaction_mapper.dart';
 
 class ExportFormScreen extends ConsumerStatefulWidget {
   const ExportFormScreen({super.key});
@@ -61,70 +61,16 @@ class _ExportFormScreenState extends ConsumerState<ExportFormScreen> {
       final pupilNames = <String, String>{};
       for (final link in instructorPupils.value ?? []) {
         final pupilData = link['pupils'];
-        final profile = pupilData?['profiles'];
-        if (pupilData != null && profile != null) {
-          pupilNames[pupilData['id']] = profile['full_name'] ?? 'Unknown';
+        if (pupilData != null) {
+          final fullName = '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim();
+          pupilNames[pupilData['id']] = fullName.isNotEmpty ? fullName : 'Unknown';
         }
       }
       
-      // Convert Supabase payments to Transaction objects
-      final transactions = instructorPayments.value?.map((payment) {
-        final paymentTypeStr = payment['payment_type'] as String?;
-        final type = paymentTypeStr == 'expense' ? TransactionType.expense : TransactionType.income;
-        
-        final paymentMethodStr = payment['payment_method'] as String?;
-        PaymentMethod? paymentMethod;
-        if (paymentMethodStr != null) {
-          switch (paymentMethodStr) {
-            case 'cash': paymentMethod = PaymentMethod.cash; break;
-            case 'card': paymentMethod = PaymentMethod.card; break;
-            case 'paypal': paymentMethod = PaymentMethod.paypal; break;
-            case 'cheque': paymentMethod = PaymentMethod.cheque; break;
-            case 'online': paymentMethod = PaymentMethod.online; break;
-            default: paymentMethod = PaymentMethod.bankTransfer;
-          }
-        }
-        
-        final categoryStr = payment['category'] as String?;
-        ExpenseCategory? category;
-        if (categoryStr != null) {
-          switch (categoryStr) {
-            case 'accounts': category = ExpenseCategory.accounts; break;
-            case 'advertising': category = ExpenseCategory.advertising; break;
-            case 'association': category = ExpenseCategory.association; break;
-            case 'bank_charges': category = ExpenseCategory.bankCharges; break;
-            case 'computer': category = ExpenseCategory.computer; break;
-            case 'dvsa_fees': category = ExpenseCategory.dvsaFees; break;
-            case 'equipment': category = ExpenseCategory.equipment; break;
-            case 'food_drink': category = ExpenseCategory.foodDrink; break;
-            case 'franchise_fee': category = ExpenseCategory.franchiseFee; break;
-            case 'fuel': category = ExpenseCategory.fuel; break;
-            case 'insurance_business': category = ExpenseCategory.insuranceBusiness; break;
-            case 'insurance_personal': category = ExpenseCategory.insurancePersonal; break;
-            case 'insurance_vehicle': category = ExpenseCategory.insuranceVehicle; break;
-            case 'insurance': category = ExpenseCategory.insurance; break;
-            case 'maintenance': category = ExpenseCategory.maintenance; break;
-            case 'lease': category = ExpenseCategory.lease; break;
-            case 'training': category = ExpenseCategory.training; break;
-            default: category = ExpenseCategory.other;
-          }
-        }
-        
-        final pupilId = payment['pupil_id'] as String?;
-        final pupilName = pupilId != null ? pupilNames[pupilId] : null;
-        
-        return Transaction(
-          id: payment['id'] as String,
-          type: type,
-          amount: (payment['amount'] as num).toDouble(),
-          description: payment['description'] ?? 'Payment',
-          date: DateTime.parse(payment['payment_date']),
-          pupilId: pupilId,
-          pupilName: pupilName,
-          paymentMethod: paymentMethod,
-          category: category,
-        );
-      }).toList() ?? [];
+      final transactions = instructorPayments.value
+              ?.map((payment) => transactionFromSupabaseMap(payment, pupilNames: pupilNames))
+              .toList() ??
+          [];
 
       await exportTransactionsCsv(
         transactions: transactions,

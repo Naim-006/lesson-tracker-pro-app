@@ -74,12 +74,14 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
     
     final pupil = pupilData != null && pupilData.isNotEmpty ? Pupil(
       id: pupilData['pupils']?['id'] ?? widget.pupil.id,
-      firstName: pupilData['pupils']?['profiles']?['full_name']?.split(' ').first ?? widget.pupil.firstName,
-      lastName: pupilData['pupils']?['profiles']?['full_name']?.split(' ').last ?? widget.pupil.lastName,
-      phone: pupilData['pupils']?['profiles']?['phone'] ?? widget.pupil.phone,
-      email: pupilData['pupils']?['profiles']?['email'] ?? widget.pupil.email,
+      firstName: pupilData['pupils']?['first_name'] ?? widget.pupil.firstName,
+      lastName: pupilData['pupils']?['last_name'] ?? widget.pupil.lastName,
+      phone: pupilData['pupils']?['phone'] ?? widget.pupil.phone,
+      email: pupilData['pupils']?['email'] ?? widget.pupil.email,
       postcode: pupilData['pupils']?['postcode'],
-      pickupAddresses: pupilData['pupils']?['address'] != null ? [pupilData['pupils']!['address']] : widget.pupil.pickupAddresses,
+      pickupAddresses: pupilData['pupils']?['pickup_addresses'] != null
+          ? List<String>.from(pupilData['pupils']!['pickup_addresses'])
+          : widget.pupil.pickupAddresses,
       hourlyRate: (pupilData['pupils']?['hourly_rate'] as num?)?.toDouble() ?? widget.pupil.hourlyRate,
       notes: pupilData['pupils']?['notes'],
     ) : widget.pupil;
@@ -87,7 +89,9 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
     // Convert Supabase lessons to local Lesson models
     final lessons = instructorLessons.value?.where((l) => l['pupil_id'] == pupil.id).map((lesson) {
       final pupilData = lesson['pupils'];
-      final profile = pupilData?['profiles'];
+      final String pupilName = pupilData != null
+          ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+          : 'Unknown';
       DateTime parsedDate;
       try {
         parsedDate = DateTime.parse(lesson['date']);
@@ -96,7 +100,7 @@ class _PupilDetailScreenState extends ConsumerState<PupilDetailScreen>
       }
       return Lesson(
         pupilId: lesson['pupil_id'],
-        pupilName: profile?['full_name'] ?? 'Unknown',
+        pupilName: pupilName.isNotEmpty ? pupilName : 'Unknown',
         date: parsedDate,
         time: lesson['time'],
         duration: lesson['duration'] ?? 60,

@@ -13,6 +13,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
   final user = Supabase.instance.client.auth.currentUser;
   List<Map<String, dynamic>> _invoices = [];
   List<Map<String, dynamic>> _payments = [];
+  Map<String, dynamic>? _instructorPaymentInfo;
   bool _isLoading = true;
   String _selectedTab = 'invoices';
 
@@ -26,23 +27,33 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
     if (user == null) return;
 
     try {
-      // Load invoices
+      // Load invoices for this pupil
       final invoicesResponse = await Supabase.instance.client
           .from('invoices')
-          .select('*, instructors!inner(profiles!inner(full_name))')
+          .select('*, profiles!instructor_id(full_name, phone, email)')
           .eq('pupil_id', user!.id)
           .order('created_at', ascending: false);
 
-      // Load payments
+      // Load payment transactions for this pupil
       final paymentsResponse = await Supabase.instance.client
-          .from('payments')
+          .from('transactions')
           .select('*')
           .eq('pupil_id', user!.id)
-          .order('created_at', ascending: false);
+          .order('date', ascending: false);
+
+      // Load instructor's payment info (bank info for pupils to pay)
+      // First find who this pupil's instructor is via instructor_pupil_links
+      final linkResponse = await Supabase.instance.client
+          .from('instructor_pupil_links')
+          .select('instructor_id, profiles!instructor_id(full_name, phone, email, business_name)')
+          .eq('pupil_id', user!.id)
+          .eq('status', 'active')
+          .maybeSingle();
 
       setState(() {
         _invoices = List<Map<String, dynamic>>.from(invoicesResponse);
         _payments = List<Map<String, dynamic>>.from(paymentsResponse);
+        _instructorPaymentInfo = linkResponse?['profiles'];
         _isLoading = false;
       });
     } catch (e) {
@@ -55,7 +66,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
   double _calculateTotalPending() {
     return _invoices
         .where((inv) => inv['status'] == 'pending')
-        .fold<double>(0, (sum, inv) => sum + (inv['amount'] as num));
+        .fold<double>(0, (sum, inv) => sum + ((inv['amount'] as num?) ?? 0));
   }
 
   double _calculateTotalPaid() {
@@ -66,15 +77,19 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payments'),
-        backgroundColor: Colors.green,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF3751F)))
           : Column(
               children: [
+                if (_instructorPaymentInfo != null)
+                  _buildInstructorPayInfo(isDark),
                 _buildSummaryCards(),
                 _buildTabBar(),
                 Expanded(
@@ -84,6 +99,57 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildInstructorPayInfo(bool isDark) {
+    final info = _instructorPaymentInfo!;
+    final name = info['business_name'] ?? info['full_name'] ?? 'Your Instructor';
+    final phone = info['phone'] ?? '';
+    final email = info['email'] ?? '';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3751F).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF3751F).withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('How to Pay Your Instructor', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFFF3751F))),
+          const SizedBox(height: 10),
+          Text('Instructor: $name', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          if (phone.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone, size: 14, color: Color(0xFFF3751F)),
+                  const SizedBox(width: 6),
+                  Text(phone, style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+          if (email.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.email_outlined, size: 14, color: Color(0xFFF3751F)),
+                  const SizedBox(width: 6),
+                  Text(email, style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          const Text(
+            'Contact your instructor to get their bank transfer or mobile banking details (e.g. Monzo, Starling, Barclays).',
+            style: TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+        ],
+      ),
     );
   }
 
@@ -287,18 +353,19 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
 
   Future<void> _processPayment(Map<String, dynamic> invoice) async {
     try {
-      // Create payment record
-      await Supabase.instance.client.from('payments').insert({
+      // Insert a transaction record for this payment
+      await Supabase.instance.client.from('transactions').insert({
         'instructor_id': invoice['instructor_id'],
         'pupil_id': user!.id,
+        'pupil_name': invoice['pupil_name'] ?? '',
         'amount': invoice['amount'],
-        'description': invoice['description'],
+        'description': invoice['description'] ?? 'Invoice payment',
+        'date': DateTime.now().toIso8601String(),
         'type': 'income',
         'payment_method': 'online',
-        'status': 'completed',
       });
 
-      // Update invoice status
+      // Update invoice status to paid
       await Supabase.instance.client
           .from('invoices')
           .update({'status': 'paid'})
@@ -307,12 +374,12 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
       if (!mounted) return;
       _loadData();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment successful')),
+        const SnackBar(content: Text('Payment recorded successfully')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment failed: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }

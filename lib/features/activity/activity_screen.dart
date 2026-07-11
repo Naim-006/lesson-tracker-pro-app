@@ -74,17 +74,17 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen>
     final instructorPupils = ref.read(instructorPupilsProvider);
 
     final pupils = instructorPupils.value?.map((link) {
-      final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
+      final pupilData = link['pupils'] ?? <String, dynamic>{};
       return Pupil(
         id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
         postcode: pupilData['postcode'],
-        pickupAddresses:
-            pupilData['address'] != null ? [pupilData['address']] : [],
+        pickupAddresses: pupilData['pickup_addresses'] != null
+            ? List<String>.from(pupilData['pickup_addresses'])
+            : [],
         outstandingBalance: 0.0,
       );
     }).toList() ?? [];

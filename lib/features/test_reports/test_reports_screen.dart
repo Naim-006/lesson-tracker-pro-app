@@ -330,13 +330,17 @@ class _TestReportsScreenState extends ConsumerState<TestReportsScreen> {
                     itemCount: reports.value!.length,
                     itemBuilder: (context, i) {
                       final r = reports.value![i];
-                      final pupilName = r['pupils']?['profiles']?['full_name'] ?? 'Unknown';
+                      final pupilData = r['pupils'];
+                      final String pupilName = pupilData != null
+                          ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+                          : 'Unknown';
+                      final String resolvedPupilName = pupilName.isNotEmpty ? pupilName : 'Unknown';
                       return _StudentPerformanceCard(
                         report: r,
-                        pupilName: pupilName,
+                        pupilName: resolvedPupilName,
                         resultColor: _resultColor(r['result']),
                         onDelete: () => _deleteReport(r['id']),
-                        onTap: () => _showDetail(context, r, pupilName),
+                        onTap: () => _showDetail(context, r, resolvedPupilName),
                       );
                     },
                   ),

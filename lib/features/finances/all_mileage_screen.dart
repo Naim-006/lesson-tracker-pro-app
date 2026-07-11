@@ -64,7 +64,7 @@ class AllMileageScreen extends ConsumerWidget {
                 final entry = mileageEntries[index];
                 final miles = entry['miles'] as num;
                 final date = DateTime.parse(entry['date']);
-                final description = entry['description'] ?? 'Mileage entry';
+                final description = entry['notes'] as String? ?? 'Mileage entry';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),

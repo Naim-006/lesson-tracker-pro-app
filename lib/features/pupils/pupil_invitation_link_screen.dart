@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
+import 'pupil_form_screen.dart';
 
 class PupilInvitationLinkScreen extends ConsumerStatefulWidget {
   const PupilInvitationLinkScreen({super.key});
@@ -18,9 +20,11 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
   String? _linkToken;
   bool _isLoading = true;
   List<Map<String, dynamic>> _submissions = [];
+  List<Map<String, dynamic>> _revokedPupils = [];
   int _pendingCount = 0;
   int _approvedCount = 0;
   int _rejectedCount = 0;
+  int _revokedCount = 0;
   String _filter = 'all';
 
   @override
@@ -63,21 +67,37 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
             .maybeSingle();
       }
 
+      if (linkResult == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
       final subsResult = await Supabase.instance.client
           .from('pupil_invite_submissions')
           .select('*')
-          .eq('link_id', linkResult['id'])
+          .eq('link_id', linkResult!['id'])
           .order('created_at', ascending: false);
 
       final subsList = subsResult as List?;
 
+      final revokedResult = await Supabase.instance.client
+          .from('instructor_pupil_links')
+          .select('pupil_id, pupils(id, first_name, last_name, email)')
+          .eq('instructor_id', user.id)
+          .eq('status', 'revoked')
+          .order('linked_at', ascending: false);
+
+      final revokedList = revokedResult as List?;
+
       if (mounted) {
         setState(() {
-          _linkToken = linkResult['token'];
+          _linkToken = linkResult!['token'];
           _submissions = List<Map<String, dynamic>>.from(subsList ?? []);
+          _revokedPupils = List<Map<String, dynamic>>.from(revokedList ?? []);
           _pendingCount = _submissions.where((s) => s['status'] == 'pending').length;
           _approvedCount = _submissions.where((s) => s['status'] == 'approved').length;
           _rejectedCount = _submissions.where((s) => s['status'] == 'rejected').length;
+          _revokedCount = _revokedPupils.length;
           _isLoading = false;
         });
       }
@@ -91,32 +111,44 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      final submissionData = action == 'approve'
-          ? await Supabase.instance.client
-              .from('pupil_invite_submissions')
-              .select('email, first_name, last_name, phone')
-              .eq('id', id)
-              .single()
-          : null;
+      if (action == 'reject') {
+        await Supabase.instance.client
+            .from('pupil_invite_submissions')
+            .delete()
+            .eq('id', id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Rejected'), backgroundColor: AppColors.success),
+          );
+          _loadLink();
+        }
+        return;
+      }
+
+      final submissionData = await Supabase.instance.client
+          .from('pupil_invite_submissions')
+          .select('email, first_name, last_name, phone')
+          .eq('id', id)
+          .single();
 
       await Supabase.instance.client
           .from('pupil_invite_submissions')
           .update({
-            'status': action == 'approve' ? 'approved' : 'rejected',
+            'status': 'approved',
             'reviewed_at': DateTime.now().toIso8601String(),
             'review_notes': notes,
           })
           .eq('id', id);
 
       if (action == 'approve' && submissionData != null) {
-        final existingInvitation = await Supabase.instance.client
+        final existingInv = await Supabase.instance.client
             .from('pupil_invitations')
             .select('id')
             .eq('email', submissionData['email'])
             .eq('instructor_id', user.id)
             .maybeSingle();
 
-        if (existingInvitation == null) {
+        if (existingInv == null) {
           await Supabase.instance.client.from('pupil_invitations').insert({
             'instructor_id': user.id,
             'email': submissionData['email'],
@@ -131,10 +163,7 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(action == 'approve' ? 'Approved! Pupil will be invited to sign up.' : 'Rejected.'),
-            backgroundColor: action == 'approve' ? AppColors.success : AppColors.error,
-          ),
+          const SnackBar(content: Text('Approved! Pupil added to your list.'), backgroundColor: AppColors.success),
         );
         _loadLink();
       }
@@ -240,19 +269,98 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildLinkCard(isDark),
-            const SizedBox(height: 16),
-            _buildStatsRow(isDark),
-            const SizedBox(height: 16),
+            if (_filter != 'history') _buildLinkCard(isDark),
+            if (_filter != 'history') const SizedBox(height: 16),
+            if (_filter != 'history') _buildStatsRow(isDark),
+            if (_filter != 'history') const SizedBox(height: 16),
             _buildFilterTabs(isDark),
             const SizedBox(height: 12),
-            if (filtered.isEmpty)
+            if (_filter == 'history')
+              _buildHistoryView(isDark)
+            else if (filtered.isEmpty)
               _buildEmptyState(isDark)
             else
               ...filtered.map((sub) => _buildSubmissionCard(sub, isDark)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryView(bool isDark) {
+    if (_revokedPupils.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.history, size: 48, color: Colors.grey.shade300),
+              const SizedBox(height: 12),
+              Text(
+                'No revoked pupils',
+                style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: _revokedPupils.map((link) {
+        final pupilData = link['pupils'] as Map<String, dynamic>?;
+        final name = pupilData != null
+            ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+            : 'Unknown';
+        final email = pupilData?['email'] ?? '';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                    Text(email, style: TextStyle(fontSize: 12, color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.grey.shade500)),
+                  ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _unrevokePupil(link),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Reactivate'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -320,6 +428,58 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
     );
   }
 
+  Future<void> _unrevokePupil(Map<String, dynamic> link) async {
+    final pupilId = link['pupil_id'];
+    final pupilData = link['pupils'] as Map<String, dynamic>?;
+    final name = pupilData != null
+        ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+        : 'this pupil';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reactivate Pupil'),
+        content: Text('Reactivate $name? They will be able to log in again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.success),
+            child: const Text('Reactivate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await Supabase.instance.client
+          .from('instructor_pupil_links')
+          .update({ 'status': 'active' })
+          .eq('pupil_id', pupilId);
+
+      await Supabase.instance.client
+          .from('pupils')
+          .update({ 'status': 'current' })
+          .eq('id', pupilId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pupil reactivated'), backgroundColor: AppColors.success),
+        );
+        _loadLink();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   Widget _buildStatsRow(bool isDark) {
     return Row(
       children: [
@@ -363,6 +523,7 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
           _filterTab('pending', 'Pending', badge: _pendingCount),
           _filterTab('approved', 'Approved'),
           _filterTab('rejected', 'Rejected'),
+          _filterTab('history', 'History', badge: _revokedCount),
         ],
       ),
     );
@@ -541,6 +702,56 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
               ],
             ),
           ],
+          if (status == 'approved') ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _deleteApprovedPupil(sub),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    label: const Text('Remove'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _editApprovedPupil(sub),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Edit'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.sunsetBright,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (status == 'rejected') ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _deleteApprovedPupil(sub),
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('Delete'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -585,6 +796,195 @@ class _PupilInvitationLinkScreenState extends ConsumerState<PupilInvitationLinkS
         ],
       ),
     );
+  }
+
+  Future<void> _editApprovedPupil(Map<String, dynamic> sub) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final pupilData = await Supabase.instance.client
+          .from('pupils')
+          .select('id, first_name, last_name, phone, email, postcode, pickup_addresses, dropoff_addresses, hourly_rate, status')
+          .eq('email', sub['email'])
+          .eq('instructor_id', user.id)
+          .maybeSingle();
+
+      if (pupilData == null) return;
+
+      final pupil = Pupil(
+        id: pupilData['id'],
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
+        postcode: pupilData['postcode'],
+        pickupAddresses: List<String>.from(pupilData['pickup_addresses'] ?? []),
+        dropoffAddresses: List<String>.from(pupilData['dropoff_addresses'] ?? []),
+        hourlyRate: (pupilData['hourly_rate'] as num?)?.toDouble() ?? 40.0,
+      );
+
+      if (mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PupilFormScreen(existing: pupil)),
+        );
+        _loadLink();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _deleteApprovedPupil(Map<String, dynamic> sub) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    final email = sub['email'] ?? '';
+    final name = '${sub['first_name'] ?? ''} ${sub['last_name'] ?? ''}'.trim();
+
+    final hasAuth = await Supabase.instance.client
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .eq('role', 'pupil')
+        .maybeSingle();
+
+    if (hasAuth != null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Revoke Pupil'),
+          content: Text('Revoke $name\'s access? Their data will be preserved and they can be reactivated later.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Revoke'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      try {
+        final result = await Supabase.instance.client
+            .from('pupils')
+            .select('id')
+            .eq('instructor_id', user.id)
+            .eq('email', email)
+            .maybeSingle();
+
+        final pupilId = result?['id'] as String?;
+
+        await Supabase.instance.client
+            .from('pupil_invitations')
+            .delete()
+            .eq('instructor_id', user.id)
+            .eq('email', email);
+
+        if (pupilId != null) {
+          await Supabase.instance.client
+              .from('instructor_pupil_links')
+              .update({ 'status': 'revoked' })
+              .eq('instructor_id', user.id)
+              .eq('pupil_id', pupilId);
+
+          await Supabase.instance.client
+              .from('pupils')
+              .update({ 'status': 'cancelled' })
+              .eq('id', pupilId);
+        }
+
+        await Supabase.instance.client
+            .from('pupil_invite_submissions')
+            .delete()
+            .eq('id', sub['id']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pupil access revoked'), backgroundColor: AppColors.warning),
+          );
+          _loadLink();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Remove Pupil'),
+          content: Text('Remove $name from your pupil list? They haven\'t signed up yet, so this will delete their registration data.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      try {
+        final result = await Supabase.instance.client
+            .from('pupils')
+            .select('id')
+            .eq('instructor_id', user.id)
+            .eq('email', email)
+            .maybeSingle();
+
+        final pupilId = result?['id'] as String?;
+
+        await Supabase.instance.client
+            .from('pupil_invitations')
+            .delete()
+            .eq('instructor_id', user.id)
+            .eq('email', email);
+
+        if (pupilId != null) {
+          try {
+            await Supabase.instance.client
+                .from('pupils')
+                .delete()
+                .eq('id', pupilId);
+          } catch (_) {
+            await Supabase.instance.client
+                .from('instructor_pupil_links')
+                .delete()
+                .eq('instructor_id', user.id)
+                .eq('pupil_id', pupilId);
+          }
+        }
+
+        await Supabase.instance.client
+            .from('pupil_invite_submissions')
+            .delete()
+            .eq('id', sub['id']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pupil removed'), backgroundColor: AppColors.success),
+          );
+          _loadLink();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
   }
 
   void _showWebDashboard() {

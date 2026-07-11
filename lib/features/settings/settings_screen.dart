@@ -10,13 +10,10 @@ import '../../features/auth/role_selection_screen.dart';
 import 'vehicles_screen.dart';
 import 'work_hours_screen.dart';
 import '../finances/export_form_screen.dart';
-import 'payment_methods_screen.dart';
-import 'teaching_resources_screen.dart';
 import 'pricing_packages_screen.dart';
 import 'lesson_lengths_screen.dart';
 import 'progress_syllabus_screen.dart';
 import 'your_terms_screen.dart';
-import 'pupil_resources_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -36,7 +33,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     final s = ref.read(settingsProvider);
     _name = TextEditingController(text: s.instructorName);
     _title = TextEditingController(text: s.instructorTitle);
@@ -77,7 +74,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           tabs: const [
             Tab(text: 'BUSINESS'),
             Tab(text: 'TEACHING'),
-            Tab(text: 'ACCOUNT'),
           ],
         ),
       ),
@@ -86,7 +82,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         children: [
           _BusinessTab(settings: s, nameController: _name, titleController: _title, businessNameController: _businessName, termsController: _termsText, onSave: _save),
           _TeachingTab(settings: s, onSave: _save),
-          _AccountTab(settings: s, onSave: _save, nameController: _name, titleController: _title, businessNameController: _businessName),
         ],
       ),
     );
@@ -205,121 +200,6 @@ class _BusinessTab extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Payments
-        _SectionHeader(title: 'Payments', icon: Icons.payment),
-        const SizedBox(height: 12),
-        _SettingsCard(
-          child: Column(
-            children: [
-              SwitchListTile(
-                title: const Text('Accept online payments'),
-                subtitle: const Text('Enable Lesson Tracker Payments'),
-                value: settings.acceptOnlinePayments,
-                onChanged: (v) => onSave(settings.copyWith(acceptOnlinePayments: v)),
-                activeThumbColor: AppColors.sunsetBright,
-              ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Payment methods'),
-                subtitle: const Text('Configure accepted payment options'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Banking & Stripe
-        _SectionHeader(title: 'Banking & Stripe', icon: Icons.account_balance),
-        const SizedBox(height: 12),
-        _SettingsCard(
-          child: Column(
-            children: [
-              ListTile(
-                leading: Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.sunsetBright.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.credit_card, color: AppColors.sunsetBright, size: 20),
-                ),
-                title: const Text('Connect Stripe Account'),
-                subtitle: const Text('Receive payouts directly to your bank'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Stripe Connect'),
-                      content: const Text(
-                        'Connect your Stripe account to receive secure payouts directly to your bank. '
-                        'Your card details are never stored by us — Stripe handles all payment processing securely.',
-                      ),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                        FilledButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Stripe Connect integration will be available soon'),
-                                backgroundColor: AppColors.sunsetBright,
-                              ),
-                            );
-                          },
-                          style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-                          child: const Text('Connect'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.account_balance, color: AppColors.info, size: 20),
-                ),
-                title: const Text('Bank Account Details'),
-                subtitle: const Text('Manage your payout bank account'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Bank Account'),
-                      content: const Text(
-                        'Your bank account details are managed securely through Stripe. '
-                        'We never store your bank account information directly.',
-                      ),
-                      actions: [
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
         // COVID
         _SectionHeader(title: 'COVID-19 Policy', icon: Icons.health_and_safety),
         const SizedBox(height: 12),
@@ -413,78 +293,6 @@ class _TeachingTab extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const ProgressSyllabusScreen()),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Teaching Resources Card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.folder_open, color: AppColors.sunsetBright, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Teaching Resources', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  title: const Text('Teaching resources', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Documents, handouts, lesson plans'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const TeachingResourcesScreen()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  title: const Text('Pupil resources', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Share resources with pupils'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PupilResourcesScreen()),
                     );
                   },
                 ),
@@ -588,47 +396,96 @@ class _AccountTab extends ConsumerStatefulWidget {
 }
 
 class _AccountTabState extends ConsumerState<_AccountTab> {
-  late FocusNode _nameFocus;
-  late FocusNode _titleFocus;
-  late FocusNode _businessNameFocus;
+  bool _savingProfile = false;
+  late TextEditingController _phoneCtrl;
+  late TextEditingController _emailCtrl;
+  late TextEditingController _bankSortCodeCtrl;
+  late TextEditingController _bankAccountCtrl;
+  late TextEditingController _bankNameCtrl;
+  late TextEditingController _monzoLinkCtrl;
+  late TextEditingController _paypalCtrl;
 
   @override
   void initState() {
     super.initState();
-    _nameFocus = FocusNode();
-    _titleFocus = FocusNode();
-    _businessNameFocus = FocusNode();
-    _nameFocus.addListener(_onNameFocusChange);
-    _titleFocus.addListener(_onTitleFocusChange);
-    _businessNameFocus.addListener(_onBusinessNameFocusChange);
+    _phoneCtrl = TextEditingController();
+    _emailCtrl = TextEditingController();
+    _bankSortCodeCtrl = TextEditingController();
+    _bankAccountCtrl = TextEditingController();
+    _bankNameCtrl = TextEditingController();
+    _monzoLinkCtrl = TextEditingController();
+    _paypalCtrl = TextEditingController();
+    _loadProfile();
   }
 
   @override
   void dispose() {
-    _nameFocus.removeListener(_onNameFocusChange);
-    _titleFocus.removeListener(_onTitleFocusChange);
-    _businessNameFocus.removeListener(_onBusinessNameFocusChange);
-    _nameFocus.dispose();
-    _titleFocus.dispose();
-    _businessNameFocus.dispose();
+    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
+    _bankSortCodeCtrl.dispose();
+    _bankAccountCtrl.dispose();
+    _bankNameCtrl.dispose();
+    _monzoLinkCtrl.dispose();
+    _paypalCtrl.dispose();
     super.dispose();
   }
 
-  void _onNameFocusChange() {
-    if (!_nameFocus.hasFocus) {
-      widget.onSave(widget.settings.copyWith(instructorName: widget.nameController.text));
-    }
+  Future<void> _loadProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      final res = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name, phone, email, business_name, payment_info')
+          .eq('id', user.id)
+          .single();
+      if (!mounted) return;
+      widget.nameController.text = res['full_name'] ?? '';
+      widget.businessNameController.text = res['business_name'] ?? '';
+      _phoneCtrl.text = res['phone'] ?? '';
+      _emailCtrl.text = res['email'] ?? user.email ?? '';
+      final info = (res['payment_info'] as Map<String, dynamic>?) ?? {};
+      _bankSortCodeCtrl.text = info['sort_code'] ?? '';
+      _bankAccountCtrl.text = info['account_number'] ?? '';
+      _bankNameCtrl.text = info['bank_name'] ?? '';
+      _monzoLinkCtrl.text = info['monzo_link'] ?? '';
+      _paypalCtrl.text = info['paypal'] ?? '';
+      setState(() {});
+    } catch (_) {}
   }
 
-  void _onTitleFocusChange() {
-    if (!_titleFocus.hasFocus) {
-      widget.onSave(widget.settings.copyWith(instructorTitle: widget.titleController.text));
-    }
-  }
-
-  void _onBusinessNameFocusChange() {
-    if (!_businessNameFocus.hasFocus) {
-      widget.onSave(widget.settings.copyWith(businessName: widget.businessNameController.text));
+  Future<void> _saveProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    setState(() { _savingProfile = true; });
+    try {
+      await Supabase.instance.client.from('profiles').update({
+        'full_name': widget.nameController.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'business_name': widget.businessNameController.text.trim().isEmpty
+            ? null : widget.businessNameController.text.trim(),
+        'payment_info': {
+          'sort_code': _bankSortCodeCtrl.text.trim(),
+          'account_number': _bankAccountCtrl.text.trim(),
+          'bank_name': _bankNameCtrl.text.trim(),
+          'monzo_link': _monzoLinkCtrl.text.trim(),
+          'paypal': _paypalCtrl.text.trim(),
+        },
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving profile: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _savingProfile = false; });
     }
   }
 
@@ -664,139 +521,18 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
     );
   }
 
-  void _showCalendarPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Calendar Access'),
-        content: const Text('Lesson Tracker Pro needs access to your device calendar to sync your lessons and events. This allows you to view your schedule in your preferred calendar app.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Calendar permission granted')),
-              );
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Allow Access'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPushNotificationPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Push Notifications'),
-        content: const Text('Lesson Tracker Pro needs permission to send you push notifications for lesson reminders, payment alerts, and other important updates.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              widget.onSave(widget.settings.copyWith(notificationsEnabled: true));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Push notifications enabled')),
-              );
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Allow'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showExportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Export All Data'),
-        content: const Text('This will create a backup file containing all your pupils, lessons, payments, expenses, mileage, and settings. You can use this file to restore your data later.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                if (context.mounted) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportFormScreen()));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error exporting data: $e')),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Export'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showImportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Import Data'),
-        content: const Text('Import functionality is currently unavailable. Please use the export feature to backup your data.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCSVExportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Export to CSV'),
-        content: const Text('This will export your pupils, lessons, and payments to separate CSV files that you can open in Excel or other spreadsheet applications.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                if (context.mounted) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportFormScreen()));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error exporting to CSV: $e')),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Export'),
-          ),
-        ],
+  Widget _tf(String label, TextEditingController ctrl, {IconData? icon, bool obscure = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextField(
+        controller: ctrl,
+        obscureText: obscure,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: icon != null ? Icon(icon) : null,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
       ),
     );
   }
@@ -808,45 +544,27 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Details
-        _SectionHeader(title: 'Instructor Details', icon: Icons.person),
+        _SectionHeader(title: 'Instructor Profile', icon: Icons.person),
         const SizedBox(height: 12),
         _SettingsCard(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: widget.nameController,
-                  focusNode: _nameFocus,
-                  decoration: const InputDecoration(
-                    labelText: 'Full name',
-                    prefixIcon: Icon(Icons.person),
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.all(12),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: widget.titleController,
-                  focusNode: _titleFocus,
-                  decoration: const InputDecoration(
-                    labelText: 'Title / qualification',
-                    prefixIcon: Icon(Icons.badge),
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.all(12),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: widget.businessNameController,
-                  focusNode: _businessNameFocus,
-                  decoration: const InputDecoration(
-                    labelText: 'Business name (optional)',
-                    prefixIcon: Icon(Icons.business),
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.all(12),
-                  ),
+                _tf('Full Name', widget.nameController, icon: Icons.person),
+                _tf('Phone Number', _phoneCtrl, icon: Icons.phone),
+                _tf('Email', _emailCtrl, icon: Icons.email),
+                _tf('Qualification / Title', widget.titleController, icon: Icons.badge),
+                _tf('Business Name (optional)', widget.businessNameController, icon: Icons.business),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _savingProfile ? null : _saveProfile,
+                  icon: _savingProfile
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Save Profile'),
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
                 ),
               ],
             ),
@@ -854,87 +572,64 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
         ),
         const SizedBox(height: 24),
 
-        // Brand
-        _SectionHeader(title: 'Brand & Appearance', icon: Icons.palette),
+        _SectionHeader(title: 'UK Payment Details (Pupils Pay You)', icon: Icons.account_balance),
+        const SizedBox(height: 6),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            'These details will be visible to your pupils so they know how to pay you. Enter your UK bank account or mobile banking info below.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ),
+        _SettingsCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _tf('Bank Name (e.g. Barclays, HSBC)', _bankNameCtrl, icon: Icons.account_balance),
+                _tf('Sort Code (e.g. 20-12-34)', _bankSortCodeCtrl, icon: Icons.numbers),
+                _tf('Account Number', _bankAccountCtrl, icon: Icons.credit_card),
+                _tf('Monzo / Revolut Link (optional)', _monzoLinkCtrl, icon: Icons.link),
+                _tf('PayPal (optional)', _paypalCtrl, icon: Icons.payment),
+                const SizedBox(height: 4),
+                FilledButton.icon(
+                  onPressed: _savingProfile ? null : _saveProfile,
+                  icon: const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Save Payment Info'),
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        _SectionHeader(title: 'App Settings', icon: Icons.tune),
         const SizedBox(height: 12),
         _SettingsCard(
           child: Column(
             children: [
               ListTile(
                 title: const Text('Currency'),
-                trailing: DropdownButton<String>(
-                  value: settings.currency,
-                  items: const ['GBP', 'USD', 'EUR']
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) onSave(settings.copyWith(currency: v));
-                  },
-                ),
+                trailing: const Text('GBP', style: TextStyle(fontSize: 14, color: Colors.grey)),
               ),
               const Divider(height: 1),
               ListTile(
                 title: const Text('Timezone'),
                 trailing: DropdownButton<String>(
                   value: settings.timezone,
-                  items: const [
-                    'Europe/London',
-                    'Europe/Dublin',
-                    'America/New_York',
-                    'Australia/Sydney',
-                  ]
+                  items: const ['Europe/London', 'Europe/Dublin', 'America/New_York', 'Australia/Sydney']
                       .map((z) => DropdownMenuItem(value: z, child: Text(z)))
                       .toList(),
-                  onChanged: (v) {
-                    if (v != null) onSave(settings.copyWith(timezone: v));
-                  },
+                  onChanged: (v) { if (v != null) onSave(settings.copyWith(timezone: v)); },
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Calendar Sync
-        _SectionHeader(title: 'Calendar Sync', icon: Icons.calendar_today),
-        const SizedBox(height: 12),
-        _SettingsCard(
-          child: Column(
-            children: [
-              SwitchListTile(
-                title: const Text('Sync with device calendar'),
-                subtitle: const Text('Export lessons to Google/Apple calendar'),
-                value: settings.calendarSyncEnabled,
-                onChanged: (v) => onSave(settings.copyWith(calendarSyncEnabled: v)),
-                activeThumbColor: AppColors.sunsetBright,
-              ),
               const Divider(height: 1),
-              ListTile(
-                title: const Text('Sync calendar'),
-                trailing: const Icon(Icons.sync),
-                onTap: () => _showCalendarPermissionDialog(context),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Push Notifications
-        _SectionHeader(title: 'Notifications', icon: Icons.notifications),
-        const SizedBox(height: 12),
-        _SettingsCard(
-          child: Column(
-            children: [
               SwitchListTile(
                 title: const Text('Push notifications'),
                 value: settings.notificationsEnabled,
-                onChanged: (v) {
-                  if (v) {
-                    _showPushNotificationPermissionDialog(context);
-                  } else {
-                    onSave(settings.copyWith(notificationsEnabled: v));
-                  }
-                },
+                onChanged: (v) => onSave(settings.copyWith(notificationsEnabled: v)),
                 activeThumbColor: AppColors.sunsetBright,
               ),
               const Divider(height: 1),
@@ -944,60 +639,22 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
                 onChanged: (v) => onSave(settings.copyWith(emailNotifications: v)),
                 activeThumbColor: AppColors.sunsetBright,
               ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Lesson reminder'),
-                subtitle: Text('${settings.lessonReminderMinutes} minutes before'),
-                trailing: DropdownButton<int>(
-                  value: settings.lessonReminderMinutes,
-                  items: const [15, 30, 60, 120]
-                      .map((m) => DropdownMenuItem(value: m, child: Text('$m min')))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) onSave(settings.copyWith(lessonReminderMinutes: v));
-                  },
-                ),
-              ),
             ],
           ),
         ),
         const SizedBox(height: 24),
 
-        // Data Management
-        _SectionHeader(title: 'Data Management', icon: Icons.storage),
-        const SizedBox(height: 12),
         _SettingsCard(
-          child: Column(
-            children: [
-              ListTile(
-                title: const Text('Export all data'),
-                subtitle: const Text('Backup all your data to a file'),
-                leading: const Icon(Icons.download),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showExportDialog(context),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Import data'),
-                subtitle: const Text('Restore data from a backup file'),
-                leading: const Icon(Icons.upload),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showImportDialog(context),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                title: const Text('Export to CSV'),
-                subtitle: const Text('Export pupils, lessons, and payments to CSV'),
-                leading: const Icon(Icons.table_chart),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showCSVExportDialog(context),
-              ),
-            ],
+          child: ListTile(
+            title: const Text('Export all data'),
+            subtitle: const Text('Backup your data to a file'),
+            leading: const Icon(Icons.download, color: AppColors.sunsetBright),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportFormScreen())),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
 
-        // Sign Out
         _SettingsCard(
           child: ListTile(
             title: const Text('Sign out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
@@ -1006,25 +663,10 @@ class _AccountTabState extends ConsumerState<_AccountTab> {
           ),
         ),
         const SizedBox(height: 24),
-
-        // Version Info
         Center(
-          child: Column(
-            children: [
-              Text(
-                'Lesson Tracker Pro v1.4.85',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Checking for updates...')),
-                  );
-                },
-                child: const Text('Check for updates'),
-              ),
-            ],
+          child: Text(
+            'Lesson Tracker Pro - Production Build',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
           ),
         ),
         const SizedBox(height: 24),

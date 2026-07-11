@@ -56,21 +56,24 @@ class TestsWithoutReportsScreen extends ConsumerWidget {
               itemCount: pupilsWithoutReports.length,
               itemBuilder: (context, index) {
                 final link = pupilsWithoutReports[index];
-                final pupilData = link['pupils'];
-                final profile = pupilData?['profiles'];
-                final pupilName = profile?['full_name'] ?? 'Unknown';
-                final firstName = pupilName.split(' ').first;
+                final pupilData = link['pupils'] ?? <String, dynamic>{};
                 final pupilId = pupilData['id'];
+                final firstName = pupilData['first_name'] ?? '';
+                final lastName = pupilData['last_name'] ?? '';
+                final pupilName = '$firstName $lastName'.trim();
+                final resolvedTitle = pupilName.isNotEmpty ? pupilName : 'Unknown';
 
                 // Create a Pupil object for the form
                 final pupil = Pupil(
                   id: pupilId,
                   firstName: firstName,
-                  lastName: pupilName.split(' ').skip(1).join(' '),
-                  phone: profile?['phone'] ?? '',
-                  email: profile?['email'] ?? '',
+                  lastName: lastName,
+                  phone: pupilData['phone'] ?? '',
+                  email: pupilData['email'] ?? '',
                   postcode: pupilData['postcode'],
-                  pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
+                  pickupAddresses: pupilData['pickup_addresses'] != null
+                      ? List<String>.from(pupilData['pickup_addresses'])
+                      : [],
                 );
 
                 return Container(
@@ -95,7 +98,7 @@ class TestsWithoutReportsScreen extends ConsumerWidget {
                         style: TextStyle(color: AppColors.sunsetBright, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    title: Text(pupilName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    title: Text(resolvedTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: const Text('No test report on file'),
                     trailing: const Text('Missing Report', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
                     onTap: () {

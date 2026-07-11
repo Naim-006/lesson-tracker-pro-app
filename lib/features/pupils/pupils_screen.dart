@@ -83,16 +83,16 @@ class _PupilsScreenState extends ConsumerState<PupilsScreen>
     final pupils = instructorPupils.value?.map((link) {
       final pupilData = link['pupils'];
       if (pupilData == null) return null;
-      final profile = pupilData['profiles'];
       return Pupil(
         id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
         postcode: pupilData['postcode'],
-        pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
-        status: _mapStatus(link['status']),
+        pickupAddresses: List<String>.from(pupilData['pickup_addresses'] ?? []),
+        status: _mapStatus(pupilData['status']),
+        hourlyRate: (pupilData['hourly_rate'] as num?)?.toDouble() ?? 40.0,
         outstandingBalance: 0.0,
       );
     }).whereType<Pupil>().toList() ?? [];
@@ -496,7 +496,21 @@ class _PupilMenuButton extends ConsumerWidget {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Delete Pupil'),
-              content: Text('Are you sure you want to delete ${pupil.fullName}? This action cannot be undone.'),
+              content: const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('This will revoke the pupil\'s access:'),
+                  SizedBox(height: 8),
+                  Text('\u2022 Pupil will not be able to log in'),
+                  Text('\u2022 All data and progress will be preserved'),
+                  Text('\u2022 Auth account stays intact'),
+                  SizedBox(height: 12),
+                  Text('They can be reactivated anytime from the Registration screen.'),
+                  SizedBox(height: 8),
+                  Text('This can be undone.', style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w600)),
+                ],
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -512,15 +526,11 @@ class _PupilMenuButton extends ConsumerWidget {
           );
           if (confirmed != true) return;
 
-          final user = Supabase.instance.client.auth.currentUser;
-          if (user == null) return;
-
           try {
-            await Supabase.instance.client
-                .from('instructor_pupil_links')
-                .delete()
-                .eq('pupil_id', pupil.id)
-                .eq('instructor_id', user.id);
+            await Supabase.instance.client.functions.invoke(
+              'delete-pupil',
+              body: { 'pupil_id': pupil.id },
+            );
 
             if (context.mounted) {
               ref.invalidate(instructorPupilsProvider);
@@ -537,11 +547,11 @@ class _PupilMenuButton extends ConsumerWidget {
           }
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'call', child: Row(children: [Icon(Icons.call, size: 18), SizedBox(width: 12), Text('Call')])),
-        PopupMenuItem(value: 'email', child: Row(children: [Icon(Icons.email, size: 18), SizedBox(width: 12), Text('Email')])),
-        PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 18), SizedBox(width: 12), Text('Edit')])),
-        PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 18, color: Colors.red), SizedBox(width: 12), Text('Delete', style: TextStyle(color: Colors.red))])),
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'call', child: Row(children: [Icon(Icons.call, size: 18), SizedBox(width: 12), Text('Call')])),
+        const PopupMenuItem(value: 'email', child: Row(children: [Icon(Icons.email, size: 18), SizedBox(width: 12), Text('Email')])),
+        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 18), SizedBox(width: 12), Text('Edit')])),
+        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 18, color: Colors.red), SizedBox(width: 12), Text('Delete', style: TextStyle(color: Colors.red))])),
       ],
     );
   }

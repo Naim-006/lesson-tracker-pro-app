@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../activity/chat_screen.dart';
 
 class PupilMessagingScreen extends StatefulWidget {
   const PupilMessagingScreen({super.key});
@@ -108,10 +109,19 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: _conversations.length,
                     itemBuilder: (context, index) {
+                      final convo = _conversations[index];
                       return _ConversationCard(
-                        conversation: _conversations[index],
+                        conversation: convo,
                         onTap: () {
-                          // Navigate to chat
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                pupilId: convo['id'],
+                                pupilName: convo['profile']?['full_name'] ?? 'User',
+                              ),
+                            ),
+                          ).then((_) => _loadConversations());
                         },
                       );
                     },

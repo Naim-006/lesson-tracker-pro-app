@@ -49,11 +49,24 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
           .select('*')
           .eq('instructor_id', instructorId)
           .eq('is_booked', false)
-          .gte('date', DateTime.now().toIso8601String())
+          .gte('date', DateTime.now().toIso8601String().split('T')[0])
           .order('date', ascending: true);
 
+      final pupilId = user!.id;
+      final visibleSlots = List<Map<String, dynamic>>.from(slotsResponse).where((slot) {
+        final filter = slot['group_filter'] as String? ?? 'current_pupils_only';
+        if (filter == 'specific_pupils') {
+          final targets = slot['target_pupil_ids'];
+          if (targets is List) {
+            return targets.map((e) => e.toString()).contains(pupilId);
+          }
+          return false;
+        }
+        return filter == 'current_pupils_only' || filter == 'private_to_school';
+      }).toList();
+
       setState(() {
-        _availableSlots = List<Map<String, dynamic>>.from(slotsResponse);
+        _availableSlots = visibleSlots;
         _isLoading = false;
       });
     } catch (e) {

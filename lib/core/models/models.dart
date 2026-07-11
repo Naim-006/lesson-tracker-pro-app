@@ -10,7 +10,7 @@ enum LessonStatus { scheduled, completed, cancelled, noShow }
 
 enum LessonType { drivingLesson, mockTestSession, refresherCourse, administrativeBlock }
 
-enum PaymentMethod { bankTransfer, cash, card, paypal, lessonTrackerPro, cheque, online }
+enum PaymentMethod { bankTransfer, cash, card, paypal, cheque, online, revolut, monzo, stripe }
 
 enum PaymentType { individual, block }
 
@@ -53,7 +53,7 @@ enum ExperienceLevel { beginner, intermediate, advanced }
 
 enum BookingStatus { confirmed, tentative, completed }
 
-enum SlotGroupFilter { currentPupilsOnly, privateToSchool }
+enum SlotGroupFilter { currentPupilsOnly, specificPupils, privateToSchool }
 
 class AppNotification {
   final String id;
@@ -1131,7 +1131,7 @@ class AppSettings {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       emailNotifications: emailNotifications ?? this.emailNotifications,
       lessonReminderMinutes: lessonReminderMinutes ?? this.lessonReminderMinutes,
-      currency: currency ?? this.currency,
+      currency: 'GBP',
       defaultLessonDuration: defaultLessonDuration ?? this.defaultLessonDuration,
       timezone: timezone ?? this.timezone,
       instructorName: instructorName ?? this.instructorName,
@@ -1172,7 +1172,7 @@ class AppSettings {
         'notificationsEnabled': notificationsEnabled,
         'emailNotifications': emailNotifications,
         'lessonReminderMinutes': lessonReminderMinutes,
-        'currency': currency,
+        'currency': 'GBP',
         'defaultLessonDuration': defaultLessonDuration,
         'timezone': timezone,
         'instructorName': instructorName,
@@ -1212,7 +1212,7 @@ class AppSettings {
         notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
         emailNotifications: json['emailNotifications'] as bool? ?? true,
         lessonReminderMinutes: json['lessonReminderMinutes'] as int? ?? 60,
-        currency: json['currency'] as String? ?? 'GBP',
+        currency: 'GBP',
         defaultLessonDuration: json['defaultLessonDuration'] as int? ?? 60,
         timezone: json['timezone'] as String? ?? 'Europe/London',
         instructorName: json['instructorName'] as String? ?? 'Alex Rivers',

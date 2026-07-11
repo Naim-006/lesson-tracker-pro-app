@@ -495,10 +495,10 @@ class _PupilSelector extends ConsumerWidget {
       itemCount: pupilsList.length,
       itemBuilder: (context, index) {
         final link = pupilsList[index];
-        final pupilData = link['pupils'];
-        final profile = pupilData?['profiles'];
+        final pupilData = link['pupils'] ?? <String, dynamic>{};
         final pupilId = pupilData['id'];
-        final pupilName = profile?['full_name'] ?? 'Unknown';
+        final fullName = '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim();
+        final pupilName = fullName.isNotEmpty ? fullName : 'Unknown';
         final isSelected = selectedPupilIds.contains(pupilId);
         return CheckboxListTile(
           title: Text(pupilName),

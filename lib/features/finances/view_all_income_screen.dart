@@ -20,15 +20,22 @@ class ViewAllIncomeScreen extends ConsumerWidget {
     final pupilNames = <String, String>{};
     for (final link in instructorPupils.value ?? []) {
       final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
-      if (pupilData != null && profile != null) {
-        pupilNames[pupilData['id']] = profile['full_name'] ?? 'Unknown';
+      if (pupilData != null) {
+        final fullName = '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim();
+        pupilNames[pupilData['id']] = fullName.isNotEmpty ? fullName : 'Unknown';
       }
     }
 
-    // Filter and sort payments (all payments in Supabase are income)
-    final incomePayments = instructorPayments.value?.toList() ?? []
-      ..sort((a, b) => DateTime.parse(b['payment_date']).compareTo(DateTime.parse(a['payment_date'])));
+    DateTime parseDate(Map<String, dynamic> m) {
+      final s = (m['payment_date'] ?? m['date'] ?? m['created_at']) as String;
+      return DateTime.parse(s);
+    }
+
+    // Filter income (type = 'income' or no type filter)
+    final incomePayments = (instructorPayments.value ?? [])
+        .where((p) => p['type'] == null || p['type'] == 'income')
+        .toList()
+      ..sort((a, b) => parseDate(b).compareTo(parseDate(a)));
 
     return Scaffold(
       appBar: AppBar(
@@ -77,8 +84,8 @@ class ViewAllIncomeScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final payment = incomePayments[index];
                 final amount = (payment['amount'] as num).toDouble();
-                final description = payment['description'] ?? 'Payment';
-                final paymentDate = DateTime.parse(payment['payment_date']);
+                final description = payment['description'] as String? ?? 'Payment';
+                final paymentDate = parseDate(payment);
                 final pupilId = payment['pupil_id'];
                 final pupilName = pupilNames[pupilId];
 

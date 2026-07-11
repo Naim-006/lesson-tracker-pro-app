@@ -51,17 +51,18 @@ class _MileageDialogState extends ConsumerState<MileageDialog> {
     if (user == null) return;
 
     final miles = end - start;
+    final noteLines = <String>[
+      '${_isBusiness ? 'Business' : 'Personal'} trip',
+      'Odometer: ${start.toStringAsFixed(1)} → ${end.toStringAsFixed(1)}',
+    ];
+    if (_notes.text.trim().isNotEmpty) noteLines.add(_notes.text.trim());
     
     try {
-      // Add mileage entry
       await Supabase.instance.client.from('mileage_entries').insert({
         'instructor_id': user.id,
         'date': DateTime.now().toIso8601String().split('T')[0],
-        'start_mileage': start,
-        'end_mileage': end,
         'miles': miles,
-        'type': _isBusiness ? 'business' : 'personal',
-        'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        'notes': noteLines.join('\n'),
       });
 
       // Add expense if enabled
@@ -77,6 +78,7 @@ class _MileageDialogState extends ConsumerState<MileageDialog> {
             'category': 'fuel',
             'payment_method': 'cash',
           });
+          ref.invalidate(instructorPaymentsProvider);
         }
       }
 

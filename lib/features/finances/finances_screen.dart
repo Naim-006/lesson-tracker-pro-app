@@ -5,11 +5,13 @@ import '../../core/models/models.dart';
 import '../../core/providers/app_state_provider.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/transaction_mapper.dart';
 import '../../core/widgets/app_card.dart';
 
 import 'payment_form_screen.dart';
 import 'expense_form_screen.dart';
 import 'export_form_screen.dart';
+import 'payment_detail_screen.dart';
 import 'view_all_income_screen.dart';
 import 'view_all_expenses_screen.dart';
 import 'all_mileage_screen.dart';
@@ -47,19 +49,11 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
     final start = _focusedMonth;
     final end = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0, 23, 59, 59);
 
-    // Convert Supabase payments to Transaction models
-    final payments = instructorPayments.value?.map((payment) {
-      return Transaction(
-        id: payment['id'],
-        type: TransactionType.income,
-        amount: (payment['amount'] as num).toDouble(),
-        date: DateTime.parse(payment['created_at']),
-        description: 'Payment from pupil',
-        category: ExpenseCategory.other,
-      );
-    }).toList() ?? [];
+    final txns = instructorPayments.value
+            ?.map((m) => transactionFromSupabaseMap(m))
+            .toList() ??
+        [];
 
-    // Convert Supabase invoices to Transaction models (as income)
     final invoices = instructorInvoices.value?.map((invoice) {
       return Transaction(
         id: invoice['id'],
@@ -71,8 +65,7 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
       );
     }).toList() ?? [];
 
-    // Combine payments and invoices
-    final allTransactions = [...payments, ...invoices];
+    final allTransactions = [...txns, ...invoices];
 
     final txs = allTransactions.where((t) {
       return !t.date.isBefore(start) && !t.date.isAfter(end);
@@ -273,7 +266,10 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _TransactionTile(t: incomeTxs[index], sym: sym),
+                (context, index) => _TransactionTile(
+                  t: incomeTxs[index], sym: sym,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentDetailScreen(transaction: incomeTxs[index]))),
+                ),
                 childCount: incomeTxs.length > 3 ? 3 : incomeTxs.length,
               ),
             ),
@@ -324,7 +320,10 @@ class _FinancesScreenState extends ConsumerState<FinancesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _TransactionTile(t: expenseTxs[index], sym: sym),
+                (context, index) => _TransactionTile(
+                  t: expenseTxs[index], sym: sym,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentDetailScreen(transaction: expenseTxs[index]))),
+                ),
                 childCount: expenseTxs.length > 3 ? 3 : expenseTxs.length,
               ),
             ),
@@ -398,15 +397,17 @@ class _Kpi extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.t, required this.sym});
+  const _TransactionTile({required this.t, required this.sym, this.onTap});
   final Transaction t;
   final String sym;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final isIncome = t.type == TransactionType.income;
     return AppCard(
       margin: const EdgeInsets.only(bottom: 8),
+      onTap: onTap,
       child: Row(children: [
         Container(
           width: 44, height: 44,

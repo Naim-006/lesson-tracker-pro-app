@@ -261,12 +261,24 @@ final pupilOpenSlotsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
         .select('*')
         .eq('instructor_id', instructorId)
         .eq('is_booked', false)
-        .eq('status', 'available')
-        .gte('date', DateTime.now().toIso8601String())
+        .gte('date', DateTime.now().toIso8601String().split('T')[0])
         .order('date', ascending: true)
         .order('start_time', ascending: true);
 
-    return List<Map<String, dynamic>>.from(response);
+    final pupilId = user.id;
+    final slots = List<Map<String, dynamic>>.from(response).where((slot) {
+      final filter = slot['group_filter'] as String? ?? 'current_pupils_only';
+      if (filter == 'specific_pupils') {
+        final targets = slot['target_pupil_ids'];
+        if (targets is List) {
+          return targets.map((e) => e.toString()).contains(pupilId);
+        }
+        return false;
+      }
+      return filter == 'current_pupils_only' || filter == 'private_to_school';
+    }).toList();
+
+    return slots;
   } catch (e) {
     return [];
   }

@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/models/models.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
+import 'specific_pupil_picker_sheet.dart';
 
 class OpenSlotFormScreen extends ConsumerStatefulWidget {
   const OpenSlotFormScreen({super.key});
@@ -25,9 +25,9 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
   String _frequency = 'Weekly';
   int _count = 5;
 
-  String _groupFilter = 'Current Pupils Only';
+  String _groupFilter = 'current';
   String _gearboxFilter = 'Any';
-  final List<Pupil> _selectedPupils = [];
+  final Set<String> _selectedPupilIds = {};
   
   final _messageController = TextEditingController();
   bool _requireOnlinePay = false;
@@ -40,6 +40,13 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_groupFilter == 'specific' && _selectedPupilIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one pupil')),
+      );
+      return;
+    }
     
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
@@ -50,9 +57,14 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
       'start_time': '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
       'duration': _duration,
       'is_recurring': _multiSlot,
-      'recurrence_type': _multiSlot ? _frequency.toLowerCase() : null,
+      'recurrence_type': _multiSlot ? _frequency.toLowerCase().replaceAll(' ', '_') : null,
       'accepts_online_payment': _requireOnlinePay,
-      'status': 'available',
+      'group_filter': _groupFilter == 'specific' ? 'specific_pupils' : 'current_pupils_only',
+      'gearbox_filter': _mapGearboxFilter(_gearboxFilter),
+      'target_pupil_ids': _groupFilter == 'specific' ? _selectedPupilIds.toList() : <String>[],
+      'custom_message': _messageController.text.trim().isEmpty ? null : _messageController.text.trim(),
+      'slot_count': _multiSlot ? _count : 1,
+      'status': 'tentative',
     };
 
     try {
@@ -60,11 +72,14 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
       
       final durationHrs = (_duration / 60).toStringAsFixed(1).replaceAll('.0', '');
       final timeStr = DateFormat('HH:mm').format(DateTime(2020, 1, 1, _time.hour, _time.minute));
+      final audience = _groupFilter == 'specific'
+          ? '${_selectedPupilIds.length} selected pupil${_selectedPupilIds.length == 1 ? '' : 's'}'
+          : 'all current pupils';
       
       if (mounted) {
         ref.invalidate(instructorSlotsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Offered $_count nearby pupils a $durationHrs hours lesson at $timeStr')),
+          SnackBar(content: Text('Open slot offered to $audience · $durationHrs hr at $timeStr')),
         );
         Navigator.pop(context);
       }
@@ -74,6 +89,48 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
           SnackBar(content: Text(userFriendlyError(e))),
         );
       }
+    }
+  }
+
+  String _mapGearboxFilter(String filter) {
+    switch (filter) {
+      case 'Manual':
+        return 'manual';
+      case 'Automatic':
+        return 'automatic';
+      default:
+        return 'any';
+    }
+  }
+
+  List<SelectablePupil> _activePupils(List<Map<String, dynamic>> links) {
+    return links
+        .where((link) => link['status'] == 'active')
+        .map((link) {
+          final pupilData = link['pupils'] as Map<String, dynamic>? ?? {};
+          final createdRaw = pupilData['created_at'] as String? ?? link['created_at'] as String?;
+          return SelectablePupil(
+            id: pupilData['id'] as String,
+            fullName: '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim(),
+            sortDate: createdRaw != null ? DateTime.parse(createdRaw) : DateTime.fromMillisecondsSinceEpoch(0),
+          );
+        })
+        .where((p) => p.id.isNotEmpty && p.fullName.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _openPupilPicker(List<SelectablePupil> pupils) async {
+    final result = await showSpecificPupilPicker(
+      context: context,
+      pupils: pupils,
+      initialSelection: _selectedPupilIds,
+    );
+    if (result != null) {
+      setState(() {
+        _selectedPupilIds
+          ..clear()
+          ..addAll(result);
+      });
     }
   }
 
@@ -90,21 +147,8 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
   @override
   Widget build(BuildContext context) {
     final instructorPupils = ref.watch(instructorPupilsProvider);
-
-    // Convert Supabase data to local Pupil models
-    final allPupils = instructorPupils.value?.map((link) {
-      final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
-      return Pupil(
-        id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
-        postcode: pupilData['postcode'],
-        pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
-      );
-    }).toList() ?? [];
+    final activePupils = _activePupils(instructorPupils.value ?? []);
+    final pupilNameById = {for (final p in activePupils) p.id: p.fullName};
     
     return Scaffold(
       appBar: AppBar(
@@ -419,159 +463,153 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                   ),
                   const SizedBox(height: 20),
                   Container(
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _groupFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Who can see this slot?',
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: ['Current Pupils Only', 'All Pupils', 'Public (Marketplace)'].map((String val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
-                      onChanged: (v) => setState(() => _groupFilter = v!),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _OpenToOption(
+                            label: 'All current pupils',
+                            subtitle: 'Visible to active pupils',
+                            selected: _groupFilter == 'current',
+                            onTap: () => setState(() {
+                              _groupFilter = 'current';
+                              _selectedPupilIds.clear();
+                            }),
+                          ),
+                        ),
+                        Expanded(
+                          child: _OpenToOption(
+                            label: 'Specific pupils',
+                            subtitle: 'Choose who can see it',
+                            selected: _groupFilter == 'specific',
+                            onTap: () => setState(() => _groupFilter = 'specific'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  if (_groupFilter == 'current') ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'This slot will be visible to all ${activePupils.length} active pupil${activePupils.length == 1 ? '' : 's'} linked to you.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+                    ),
+                  ],
+                  if (_groupFilter == 'specific') ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: activePupils.isEmpty
+                          ? null
+                          : () => _openPupilPicker(activePupils),
+                      icon: const Icon(Icons.group_add),
+                      label: Text(
+                        _selectedPupilIds.isEmpty
+                            ? 'Select pupils'
+                            : '${_selectedPupilIds.length} pupil${_selectedPupilIds.length == 1 ? '' : 's'} selected',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: AppColors.sunsetBright),
+                        foregroundColor: AppColors.sunsetBright,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    if (_selectedPupilIds.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _selectedPupilIds.map((id) {
+                          return Chip(
+                            label: Text(pupilNameById[id] ?? 'Pupil'),
+                            deleteIcon: const Icon(Icons.close, size: 18),
+                            onDeleted: () => setState(() => _selectedPupilIds.remove(id)),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // Audience Targeting Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.group, color: AppColors.sunsetBright, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Audience Targeting', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _groupFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Group',
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: ['Current Pupils Only', 'Private', 'Public (Marketplace)'].map((String val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
-                      onChanged: (v) => setState(() => _groupFilter = v!),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _gearboxFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Gearbox Filter',
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: ['Any', 'Manual', 'Automatic'].map((String val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
-                      onChanged: (v) => setState(() => _gearboxFilter = v!),
-                    ),
-                  ),
-                ],
-              ),
+            // Gearbox Card
+Container(
+  padding: const EdgeInsets.all(20),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(16),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.05),
+        blurRadius: 10,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.sunsetBright.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(height: 24),
-
-            // Specific Pupils Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.sunsetBright.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.person_search, color: AppColors.sunsetBright, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Specific Pupils (Optional)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownMenu<Pupil>(
-                      width: MediaQuery.of(context).size.width - 80,
-                      label: const Text('Search pupil...'),
-                      dropdownMenuEntries: allPupils.map((p) => DropdownMenuEntry(value: p, label: p.fullName)).toList(),
-                      onSelected: (p) {
-                        if (p != null && !_selectedPupils.contains(p)) {
-                          setState(() => _selectedPupils.add(p));
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_selectedPupils.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      children: _selectedPupils.map((p) => Chip(
-                        label: Text(p.firstName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        onDeleted: () => setState(() => _selectedPupils.remove(p)),
-                        backgroundColor: AppColors.sunsetBright.withValues(alpha: 0.1),
-                        deleteIconColor: AppColors.sunsetBright,
-                      )).toList(),
-                    ),
-                ],
-              ),
+            child: const Icon(
+              Icons.settings,
+              color: AppColors.sunsetBright,
+              size: 20,
             ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'Gearbox Filter',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: DropdownButtonFormField<String>(
+          initialValue: _gearboxFilter,
+          decoration: const InputDecoration(
+            labelText: 'Gearbox',
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          items: ['Any', 'Manual', 'Automatic']
+              .map(
+                (val) => DropdownMenuItem<String>(
+                  value: val,
+                  child: Text(val),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => _gearboxFilter = v!),
+        ),
+      ),
+    ],
+  ),
+),
+const SizedBox(height: 24),
 
             // Options Card
             Container(
@@ -622,8 +660,8 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
                     ),
                     child: SwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      title: const Text('Require online payment', style: TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: const Text('Pupils must pay to confirm booking', style: TextStyle(fontSize: 12)),
+                      title: const Text('Require payment', style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Pupils must pay first to confirm booking', style: TextStyle(fontSize: 12)),
                       value: _requireOnlinePay,
                       onChanged: (v) => setState(() => _requireOnlinePay = v),
                       activeThumbColor: AppColors.sunsetBright,
@@ -653,6 +691,57 @@ class _OpenSlotFormScreenState extends ConsumerState<OpenSlotFormScreen> {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
+  }
+}
+
+class _OpenToOption extends StatelessWidget {
+  const _OpenToOption({
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.sunsetBright : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: selected ? Colors.white : Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: selected ? Colors.white70 : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

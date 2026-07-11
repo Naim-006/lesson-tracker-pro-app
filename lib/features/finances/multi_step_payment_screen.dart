@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
@@ -51,16 +52,18 @@ class _MultiStepPaymentScreenState extends ConsumerState<MultiStepPaymentScreen>
         : (_customAmount > 0 ? _customAmount : settings.hourlyRate);
 
     try {
-      await Supabase.instance.client.from('payments').insert({
+      await Supabase.instance.client.from('transactions').insert({
         'instructor_id': user.id,
         'pupil_id': _selectedPupil?.id,
+        'pupil_name': _selectedPupil?.fullName ?? 'General',
         'amount': amount,
         'description': _paymentType == PaymentType.block
             ? 'Block payment — ${_selectedPupil?.fullName ?? "General"}'
             : 'Payment — ${_selectedPupil?.fullName ?? "General"}',
         'payment_method': 'bank_transfer',
         'type': 'income',
-        'status': 'completed',
+        'payment_type': _paymentType == PaymentType.block ? 'block' : 'individual',
+        'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       });
 
       if (mounted) {
@@ -313,17 +316,18 @@ class _SelectPupilStep extends ConsumerWidget {
 
     // Convert Supabase data to local Pupil models
     final pupils = instructorPupils.value?.map((link) {
-      final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
+      final pupilData = link['pupils'] ?? <String, dynamic>{};
       return Pupil(
         id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
         postcode: pupilData['postcode'],
-        pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
-        hourlyRate: 40.0,
+        pickupAddresses: pupilData['pickup_addresses'] != null
+            ? List<String>.from(pupilData['pickup_addresses'])
+            : [],
+        hourlyRate: (pupilData['hourly_rate'] as num?)?.toDouble() ?? 40.0,
       );
     }).toList() ?? [];
 
@@ -432,12 +436,12 @@ class _SelectLessonStep extends ConsumerWidget {
 
     // Convert Supabase data to local Lesson models
     final lessons = instructorLessons.value?.map((lessonData) {
-      final pupil = lessonData['pupils'];
-      final profile = pupil?['profiles'];
+      final pupil = lessonData['pupils'] ?? <String, dynamic>{};
+      final String pupilName = '${pupil['first_name'] ?? ''} ${pupil['last_name'] ?? ''}'.trim();
       return Lesson(
         id: lessonData['id'],
-        pupilId: pupil['id'],
-        pupilName: profile?['full_name'] ?? 'Unknown',
+        pupilId: pupil['id'] ?? '',
+        pupilName: pupilName.isNotEmpty ? pupilName : 'Unknown',
         date: DateTime.parse(lessonData['date']),
         time: lessonData['start_time'] ?? '',
         duration: lessonData['duration'] ?? 60,

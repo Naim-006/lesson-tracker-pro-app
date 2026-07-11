@@ -12,7 +12,7 @@ class SubscriptionIntroScreen extends StatefulWidget {
   State<SubscriptionIntroScreen> createState() => _SubscriptionIntroScreenState();
 }
 
-class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> {
+class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _plans = [];
   bool _isLoading = true;
   bool _isSubscribed = false;
@@ -22,7 +22,21 @@ class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -68,6 +82,13 @@ class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> {
       }
 
       if (mounted) {
+        if (subscribed) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AppShell()),
+            (route) => false,
+          );
+          return;
+        }
         setState(() {
           _plans = List<Map<String, dynamic>>.from(plansResponse);
           _isSubscribed = subscribed;
@@ -103,25 +124,17 @@ class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> {
   }
 
   Future<void> _subscribeToPlan(Map<String, dynamic> plan) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => _PaymentConfirmDialog(plan: plan),
-    );
-
-    if (confirmed != true || !mounted) return;
-
     setState(() => _isLoading = true);
     final success = await SubscriptionService().createSubscription(plan['id']);
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AppShell()),
-          (route) => false,
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Redirected to payment. Complete checkout and return to the app.')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subscription failed. Please try again.')),
+          const SnackBar(content: Text('Failed to start checkout. Please try again.')),
         );
       }
     }
@@ -638,78 +651,6 @@ class _SubscriptionIntroScreenState extends State<SubscriptionIntroScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PaymentConfirmDialog extends StatelessWidget {
-  final Map<String, dynamic> plan;
-  const _PaymentConfirmDialog({required this.plan});
-
-  @override
-  Widget build(BuildContext context) {
-    final price = plan['price'];
-    final name = plan['name'];
-    final duration = plan['duration_months'];
-    final features = (plan['features'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
-
-    return AlertDialog(
-      title: Text('Subscribe to $name'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Plan: $name', style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('Price: \u00a3$price/month'),
-          Text('Duration: $duration month(s)'),
-          const SizedBox(height: 12),
-          if (features.isNotEmpty) ...[
-            const Text('Includes:', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            ...features.map((f) => Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Row(children: [
-                    const Icon(Icons.check, size: 16, color: Colors.green),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(f, style: const TextStyle(fontSize: 13))),
-                  ]),
-                )),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(children: [
-              Icon(Icons.info_outline, size: 18, color: Colors.amber),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'You will be redirected to complete payment. Your subscription will activate immediately.',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ]),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-          child: const Text('Confirm & Pay'),
-        ),
-      ],
     );
   }
 }

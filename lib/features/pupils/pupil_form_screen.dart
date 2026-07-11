@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
@@ -76,7 +75,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    const pupilStatus = PupilStatus.current;
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
@@ -86,29 +84,16 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
         // Check for duplicate email before creating
         final email = _email.text.trim();
         if (email.isNotEmpty) {
-          final dupProfile = await Supabase.instance.client
-              .from('profiles')
+          final dupPupil = await Supabase.instance.client
+              .from('pupils')
               .select('id')
+              .eq('instructor_id', user.id)
               .eq('email', email)
               .maybeSingle();
-          if (dupProfile != null) {
+          if (dupPupil != null) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('A user with this email already exists')),
-              );
-            }
-            return;
-          }
-          final dupInvitation = await Supabase.instance.client
-              .from('pupil_invitations')
-              .select('id')
-              .eq('email', email)
-              .neq('status', 'accepted')
-              .maybeSingle();
-          if (dupInvitation != null) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('This email already has a pending invitation')),
+                const SnackBar(content: Text('A pupil with this email already exists in your list')),
               );
             }
             return;
@@ -117,59 +102,72 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
       }
 
       if (widget.existing != null) {
-        // Update existing pupil
+        // Update existing pupil — use correct schema column names
         await Supabase.instance.client.from('pupils').update({
-          'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
-          'address': _pickupAddress.text.trim().isEmpty ? null : _pickupAddress.text.trim(),
-          'dropoff_address': _dropoffAddress.text.trim().isEmpty ? null : _dropoffAddress.text.trim(),
-          'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-          'weekly_availability': _availabilityDays,
-          'gearbox_preference': _mapGearboxType(_gearbox),
-          'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-        }).eq('id', widget.existing!.id);
-
-        await Supabase.instance.client.from('profiles').update({
-          'full_name': '${_first.text.trim()} ${_last.text.trim()}',
+          'first_name': _first.text.trim(),
+          'last_name': _last.text.trim(),
           'phone': _phone.text.trim(),
           'email': _email.text.trim(),
+          'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
+          'pickup_addresses': _pickupAddress.text.trim().isEmpty ? [] : [_pickupAddress.text.trim()],
+          'dropoff_addresses': _dropoffAddress.text.trim().isEmpty ? [] : [_dropoffAddress.text.trim()],
+          'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+          'weekly_availability_days': _availabilityDays,
+          'mechanical_gearbox_preference': _gearbox.name,
+          'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
+          'updated_at': DateTime.now().toIso8601String(),
         }).eq('id', widget.existing!.id);
-
-        await Supabase.instance.client.from('instructor_pupil_links').update({
-          'status': _mapPupilStatus(pupilStatus),
-        }).eq('pupil_id', widget.existing!.id).eq('instructor_id', user.id);
 
         Logger.info('Pupil updated: ${_first.text.trim()} ${_last.text.trim()}');
       } else {
-        // Create new pupil
-        final profileId = const Uuid().v4();
-
-        await Supabase.instance.client.from('profiles').insert({
-          'id': profileId,
-          'full_name': '${_first.text.trim()} ${_last.text.trim()}',
+        // Create new pupil — insert directly into pupils table
+        // Pupils added manually by instructor are offline pupils without an auth account
+        final insertResult = await Supabase.instance.client.from('pupils').insert({
+          'instructor_id': user.id,
+          'first_name': _first.text.trim(),
+          'last_name': _last.text.trim(),
           'phone': _phone.text.trim(),
           'email': _email.text.trim(),
-          'role': 'pupil',
-        });
-
-        await Supabase.instance.client.from('pupils').insert({
-          'id': profileId,
-          'instructor_id': user.id,
           'postcode': _postcode.text.trim().isEmpty ? null : _postcode.text.trim(),
-          'address': _pickupAddress.text.trim().isEmpty ? null : _pickupAddress.text.trim(),
-          'dropoff_address': _dropoffAddress.text.trim().isEmpty ? null : _dropoffAddress.text.trim(),
+          'pickup_addresses': _pickupAddress.text.trim().isEmpty ? [] : [_pickupAddress.text.trim()],
+          'dropoff_addresses': _dropoffAddress.text.trim().isEmpty ? [] : [_dropoffAddress.text.trim()],
           'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-          'weekly_availability': _availabilityDays,
-          'gearbox_preference': _mapGearboxType(_gearbox),
+          'weekly_availability_days': _availabilityDays,
+          'mechanical_gearbox_preference': _gearbox.name,
           'hourly_rate': double.tryParse(_rate.text) ?? 40.0,
-        });
-
-        await Supabase.instance.client.from('instructor_pupil_links').insert({
-          'instructor_id': user.id,
-          'pupil_id': profileId,
-          'status': _mapPupilStatus(pupilStatus),
-        });
+          'status': 'current',
+        }).select('id').single();
 
         Logger.info('Pupil created: ${_first.text.trim()} ${_last.text.trim()}');
+
+        // Create the instructor-pupil link
+        await Supabase.instance.client.from('instructor_pupil_links').insert({
+          'instructor_id': user.id,
+          'pupil_id': insertResult['id'],
+          'status': 'active',
+        });
+
+        // Create a pending invitation so the pupil can sign up later
+        final emailStr = _email.text.trim().toLowerCase();
+        if (emailStr.isNotEmpty) {
+          final existingInv = await Supabase.instance.client
+              .from('pupil_invitations')
+              .select('id')
+              .eq('email', emailStr)
+              .eq('instructor_id', user.id)
+              .maybeSingle();
+          if (existingInv == null) {
+            await Supabase.instance.client.from('pupil_invitations').insert({
+              'instructor_id': user.id,
+              'email': emailStr,
+              'first_name': _first.text.trim(),
+              'last_name': _last.text.trim(),
+              'phone': _phone.text.trim(),
+              'status': 'pending',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        }
       }
 
       if (mounted) {
@@ -189,23 +187,6 @@ class _PupilFormScreenState extends ConsumerState<PupilFormScreen> {
     }
   }
 
-  String _mapPupilStatus(PupilStatus status) {
-    switch (status) {
-      case PupilStatus.current: return 'active';
-      case PupilStatus.waiting: return 'pending';
-      case PupilStatus.passed: return 'passed';
-      case PupilStatus.archived: return 'archived';
-      default: return 'active';
-    }
-  }
-
-  String _mapGearboxType(GearboxType type) {
-    switch (type) {
-      case GearboxType.manual: return 'manual';
-      case GearboxType.automatic: return 'automatic';
-      default: return 'manual';
-    }
-  }
 
   void _toggleDay(String day) {
     setState(() {

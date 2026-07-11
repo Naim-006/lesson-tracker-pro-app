@@ -20,17 +20,22 @@ class ViewAllExpensesScreen extends ConsumerWidget {
     final pupilNames = <String, String>{};
     for (final link in instructorPupils.value ?? []) {
       final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
-      if (pupilData != null && profile != null) {
-        pupilNames[pupilData['id']] = profile['full_name'] ?? 'Unknown';
+      if (pupilData != null) {
+        final fullName = '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim();
+        pupilNames[pupilData['id']] = fullName.isNotEmpty ? fullName : 'Unknown';
       }
     }
 
-    // Filter payments for expenses (payment_type = 'expense')
-    final expensePayments = instructorPayments.value
-        ?.where((p) => p['payment_type'] == 'expense')
-        .toList() ?? []
-      ..sort((a, b) => DateTime.parse(b['payment_date']).compareTo(DateTime.parse(a['payment_date'])));
+    DateTime parseDate(Map<String, dynamic> m) {
+      final s = (m['payment_date'] ?? m['date'] ?? m['created_at']) as String;
+      return DateTime.parse(s);
+    }
+
+    // Filter for expenses (type = 'expense' from transactions, or payment_type = 'expense' legacy)
+    final expensePayments = (instructorPayments.value ?? [])
+        .where((p) => p['type'] == 'expense' || p['payment_type'] == 'expense')
+        .toList()
+      ..sort((a, b) => parseDate(b).compareTo(parseDate(a)));
 
     return Scaffold(
       appBar: AppBar(
@@ -79,8 +84,8 @@ class ViewAllExpensesScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final payment = expensePayments[index];
                 final amount = (payment['amount'] as num).toDouble();
-                final description = payment['description'] ?? 'Expense';
-                final paymentDate = DateTime.parse(payment['payment_date']);
+                final description = payment['description'] as String? ?? 'Expense';
+                final paymentDate = parseDate(payment);
                 final pupilId = payment['pupil_id'];
                 final pupilName = pupilNames[pupilId];
 

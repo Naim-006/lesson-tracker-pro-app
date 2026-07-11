@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:functions_client/functions_client.dart';
 
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._();
@@ -12,30 +14,25 @@ class SubscriptionService {
     if (user == null) return false;
 
     try {
-      final plan = await _client
-          .from('subscription_plans')
-          .select('duration_months, price, name')
-          .eq('id', planId)
-          .single();
+      final session = _client.auth.currentSession;
+      if (session == null) return false;
 
-      final durationMonths = (plan['duration_months'] as num?)?.toInt() ?? 1;
-      final now = DateTime.now();
-      final endDate = DateTime(now.year, now.month + durationMonths, now.day);
+      final response = await _client.functions.invoke(
+        'create-checkout-session',
+        body: {'plan_id': planId},
+      );
 
-      await _client.from('instructor_subscriptions').insert({
-        'instructor_id': user.id,
-        'plan_id': planId,
-        'plan_type': plan['name'],
-        'amount': plan['price'],
-        'start_date': now.toIso8601String(),
-        'end_date': endDate.toIso8601String(),
-        'status': 'active',
-        'payment_status': 'pending',
-        'created_at': now.toIso8601String(),
-      });
+      final data = response.data is Map<String, dynamic> ? response.data as Map<String, dynamic> : null;
+      final url = data?['url'] as String?;
 
+      if (url == null || url.isEmpty) return false;
+
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       return true;
-    } catch (_) {
+    } on FunctionException catch (e) {
+      final msg = e.details is Map ? (e.details as Map)['error'] ?? 'Payment error' : 'Payment error';
+      throw Exception(msg);
+    } catch (e) {
       return false;
     }
   }

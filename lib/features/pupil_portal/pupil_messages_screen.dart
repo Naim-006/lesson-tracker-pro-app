@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../activity/chat_screen.dart';
 
 class PupilMessagesScreen extends StatefulWidget {
   const PupilMessagesScreen({super.key});
@@ -143,6 +144,17 @@ class _PupilMessagesScreenState extends State<PupilMessagesScreen> {
                               time: convo['created_at'] ?? '',
                               unread: convo['unread'] ?? 0,
                               isDark: isDark,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatScreen(
+                                      pupilId: convo['other_id'],
+                                      pupilName: convo['other_name'] ?? 'Unknown',
+                                    ),
+                                  ),
+                                ).then((_) => _loadConversations());
+                              },
                             );
                           },
                         ),
@@ -160,6 +172,7 @@ class _ConversationTile extends StatelessWidget {
     required this.time,
     required this.unread,
     required this.isDark,
+    required this.onTap,
   });
 
   final String name;
@@ -167,6 +180,7 @@ class _ConversationTile extends StatelessWidget {
   final String time;
   final int unread;
   final bool isDark;
+  final VoidCallback onTap;
 
   String _formatTime(String iso) {
     if (iso.isEmpty) return '';
@@ -192,7 +206,7 @@ class _ConversationTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {},
+          onTap: onTap,
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(

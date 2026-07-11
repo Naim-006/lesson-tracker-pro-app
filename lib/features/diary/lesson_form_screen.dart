@@ -7,6 +7,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
+import 'location_picker_screen.dart';
 
 class LessonFormScreen extends ConsumerStatefulWidget {
   const LessonFormScreen({super.key, this.existing});
@@ -156,17 +157,18 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
 
     // Convert Supabase data to local Pupil models
     final pupils = instructorPupils.value?.map((link) {
-      final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
+      final pupilData = link['pupils'] ?? <String, dynamic>{};
       return Pupil(
         id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
         postcode: pupilData['postcode'],
-        pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
-        hourlyRate: 40.0, // Default rate, should be stored in pupil data
+        pickupAddresses: pupilData['pickup_addresses'] != null
+            ? List<String>.from(pupilData['pickup_addresses'])
+            : [],
+        hourlyRate: (pupilData['hourly_rate'] as num?)?.toDouble() ?? 40.0,
       );
     }).toList() ?? [];
     
@@ -435,24 +437,50 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _pickup,
-                    decoration: InputDecoration(
-                      labelText: 'Pickup location',
-                      prefixIcon: const Icon(Icons.flight_takeoff),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
+                  _LocationField(
+                    label: 'Pickup location',
+                    icon: Icons.trip_origin,
+                    value: _pickup.text,
+                    hint: 'e.g. SW1A 1AA',
+                    onTap: () async {
+                      final result = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LocationPickerScreen(initialAddress: _pickup.text),
+                        ),
+                      );
+                      if (result != null) {
+                        _pickup.text = result;
+                        setState(() {});
+                      }
+                    },
+                    onClear: () {
+                      _pickup.clear();
+                      setState(() {});
+                    },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _dropoff,
-                    decoration: InputDecoration(
-                      labelText: 'Drop-off location',
-                      prefixIcon: const Icon(Icons.flight_land),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
+                  _LocationField(
+                    label: 'Drop-off location',
+                    icon: Icons.location_on,
+                    value: _dropoff.text,
+                    hint: 'e.g. BN1 1AA',
+                    onTap: () async {
+                      final result = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LocationPickerScreen(initialAddress: _dropoff.text),
+                        ),
+                      );
+                      if (result != null) {
+                        _dropoff.text = result;
+                        setState(() {});
+                      }
+                    },
+                    onClear: () {
+                      _dropoff.clear();
+                      setState(() {});
+                    },
                   ),
                 ],
               ),
@@ -614,6 +642,108 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
+  }
+}
+
+class _LocationField extends StatelessWidget {
+  const _LocationField({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.hint,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final String label;
+  final IconData icon;
+  final String value;
+  final String hint;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasValue = value.isNotEmpty;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: hasValue
+              ? AppColors.sunsetBright.withValues(alpha: 0.05)
+              : (isDark ? AppColors.darkCard : Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(12),
+          border: hasValue
+              ? Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.2))
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: hasValue ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: hasValue ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    hasValue ? value : hint,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                      color: hasValue
+                          ? (isDark ? AppColors.darkText : AppColors.lightText)
+                          : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (hasValue)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: onClear,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.close, size: 14, color: isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            Icon(
+              Icons.search,
+              size: 18,
+              color: hasValue ? AppColors.sunsetBright : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

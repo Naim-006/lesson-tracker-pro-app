@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
 import '../pupil_portal/pupil_shell_v2.dart';
+import '../pupil_portal/account_revoked_screen.dart';
 
 class PupilAuthScreen extends StatefulWidget {
   const PupilAuthScreen({super.key});
@@ -21,7 +22,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _fullNameController = TextEditingController();
   final _forgotEmailController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -56,7 +56,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _fullNameController.dispose();
     _forgotEmailController.dispose();
     super.dispose();
   }
@@ -111,28 +110,34 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
     }
 
     try {
-      final existingPupil = await Supabase.instance.client
-          .from('pupils')
-          .select('id')
-          .eq('id', response.user!.id)
-          .maybeSingle();
-      if (existingPupil == null) {
+      final result = await Supabase.instance.client
+          .rpc('ensure_pupil_login', params: {
+            'p_email': email,
+            'p_auth_id': response.user!.id,
+          });
+      if (mounted && result != null && result['status'] == 'not_found') {
+        // Final fallback: try pupil_invitations directly (respects RLS)
         final invitation = await Supabase.instance.client
             .from('pupil_invitations')
             .select('instructor_id, first_name, last_name, phone, postcode')
-            .eq('email', response.user!.email ?? '')
+            .eq('email', email)
             .maybeSingle();
         if (invitation != null) {
           await Supabase.instance.client.from('pupils').insert({
             'id': response.user!.id,
             'instructor_id': invitation['instructor_id'],
-            'email': response.user!.email ?? '',
+            'email': email,
             'first_name': invitation['first_name'] ?? '',
             'last_name': invitation['last_name'] ?? '',
             'phone': invitation['phone'] ?? '',
             'postcode': invitation['postcode'],
             'status': 'current',
             'created_at': DateTime.now().toIso8601String(),
+          });
+          await Supabase.instance.client.from('instructor_pupil_links').insert({
+            'instructor_id': invitation['instructor_id'],
+            'pupil_id': response.user!.id,
+            'status': 'active',
           });
         }
       }
@@ -147,7 +152,35 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
     }
 
     if (mounted) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PupilShell()));
+      final pupilData = await Supabase.instance.client
+          .from('pupils')
+          .select('status, instructor_id')
+          .eq('id', response.user!.id)
+          .maybeSingle();
+
+      final isActive = pupilData != null && pupilData['status'] == 'current';
+
+      if (isActive) {
+        if (pupilData['instructor_id'] != null) {
+          try {
+            final link = await Supabase.instance.client
+                .from('instructor_pupil_links')
+                .select('id')
+                .eq('pupil_id', response.user!.id)
+                .maybeSingle();
+            if (link == null) {
+              await Supabase.instance.client.from('instructor_pupil_links').insert({
+                'pupil_id': response.user!.id,
+                'instructor_id': pupilData['instructor_id'],
+                'status': 'active',
+              });
+            }
+          } catch (_) {}
+        }
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PupilShell()));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AccountRevokedScreen()));
+      }
     }
   }
 
@@ -157,10 +190,7 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
     Map<String, dynamic> invitation;
     try {
       final result = await Supabase.instance.client
-          .from('pupil_invitations')
-          .select('id, instructor_id, first_name, last_name, phone, postcode')
-          .eq('email', email)
-          .or('status.eq.pending,status.eq.approved')
+          .rpc('get_pupil_invitation', params: {'p_email': email})
           .maybeSingle();
 
       if (result == null) {
@@ -172,15 +202,13 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
       throw const AppAuthException('verification_failed', 'Could not verify your invitation. Please try again later.');
     }
 
-    final fullName = _fullNameController.text.trim();
-
     AuthResponse response;
     try {
       response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: _passwordController.text,
         data: {
-          'full_name': fullName.isNotEmpty ? fullName : invitation['first_name'] ?? '',
+          'full_name': '${invitation['first_name'] ?? ''} ${invitation['last_name'] ?? ''}'.trim(),
           'role': 'pupil',
         },
       );
@@ -194,17 +222,40 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
 
     if (response.user != null) {
       try {
-        final fullName = _fullNameController.text.trim();
+        final existingPupil = await Supabase.instance.client
+            .from('pupils')
+            .select('id')
+            .eq('instructor_id', invitation['instructor_id'])
+            .eq('email', email)
+            .maybeSingle();
+
+        if (existingPupil != null) {
+          await Supabase.instance.client
+              .from('instructor_pupil_links')
+              .delete()
+              .eq('pupil_id', existingPupil['id']);
+          await Supabase.instance.client
+              .from('pupils')
+              .delete()
+              .eq('id', existingPupil['id']);
+        }
+
         await Supabase.instance.client.from('pupils').insert({
           'id': response.user!.id,
           'instructor_id': invitation['instructor_id'],
           'email': email,
-          'first_name': fullName.isNotEmpty ? fullName.split(' ').first : (invitation['first_name'] ?? ''),
-          'last_name': fullName.isNotEmpty && fullName.contains(' ') ? fullName.split(' ').sublist(1).join(' ') : (invitation['last_name'] ?? ''),
+          'first_name': invitation['first_name'] ?? '',
+          'last_name': invitation['last_name'] ?? '',
           'phone': invitation['phone'] ?? '',
           'postcode': invitation['postcode'],
           'status': 'current',
           'created_at': DateTime.now().toIso8601String(),
+        });
+
+        await Supabase.instance.client.from('instructor_pupil_links').insert({
+          'instructor_id': invitation['instructor_id'],
+          'pupil_id': response.user!.id,
+          'status': 'active',
         });
 
         await Supabase.instance.client
@@ -315,14 +366,6 @@ class _PupilAuthScreenState extends State<PupilAuthScreen> {
           Text(_isLogin ? 'Sign in to track your driving lessons' : 'Join Lesson Tracker Pro as a pupil',
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]), textAlign: TextAlign.center),
           const SizedBox(height: 32),
-          if (!_isLogin) ...[
-            TextFormField(
-              controller: _fullNameController,
-              decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person), border: OutlineInputBorder()),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your full name' : null,
-            ),
-            const SizedBox(height: 16),
-          ],
           TextFormField(
             controller: _emailController,
             decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),

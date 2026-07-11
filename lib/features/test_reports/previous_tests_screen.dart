@@ -63,11 +63,13 @@ class PreviousTestsScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final report = previousTests[index];
                 final pupilData = report['pupils'];
-                final profile = pupilData?['profiles'];
                 final result = _mapTestResult(report['result']);
                 final passed = result == TestResult.pass;
                 final testDate = DateTime.parse(report['test_date']);
-                final pupilName = profile?['full_name'] ?? 'Unknown';
+                final String pupilName = pupilData != null
+                    ? '${pupilData['first_name'] ?? ''} ${pupilData['last_name'] ?? ''}'.trim()
+                    : 'Unknown';
+                final String resolvedName = pupilName.isNotEmpty ? pupilName : 'Unknown';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -93,7 +95,7 @@ class PreviousTestsScreen extends ConsumerWidget {
                         color: passed ? AppColors.success : AppColors.error,
                       ),
                     ),
-                    title: Text(pupilName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    title: Text(resolvedName, style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text('Test date: ${DateFormat('dd MMM yyyy').format(testDate)}'),
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -114,7 +116,7 @@ class PreviousTestsScreen extends ConsumerWidget {
                     ),
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('View $pupilName\'s test report')),
+                        SnackBar(content: Text('View $resolvedName\'s test report')),
                       );
                     },
                   ),

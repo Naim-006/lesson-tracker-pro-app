@@ -34,6 +34,7 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const [existingPupilEmail, setExistingPupilEmail] = useState('');
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -124,6 +125,17 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
     }
   }
 
+  async function checkPupilEmail(email: string) {
+    if (!linkData || !email || !email.includes('@')) return;
+    try {
+      const res = await fetch(`/api/check-email?email=${encodeURIComponent(email)}&link_token=${encodeURIComponent(token)}`);
+      const data = await res.json();
+      setExistingPupilEmail(data.exists ? email : '');
+    } catch {
+      // ignore fetch errors
+    }
+  }
+
   function toggleDay(day: string) {
     setForm((prev) => ({
       ...prev,
@@ -188,8 +200,12 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
 
       if (!response.ok) {
         if (response.status === 409) {
-          setError('You have already submitted a registration with this email. Check your status below.');
-          checkExistingSubmission(form.email);
+          if (result?.error?.includes('already registered as a pupil')) {
+            setError('This email is already registered as a pupil. Please sign in to your account instead.');
+          } else {
+            setError('You have already submitted a registration with this email. Check your status below.');
+            checkExistingSubmission(form.email);
+          }
         } else {
           setError(result?.error || 'Failed to submit. Please try again.');
         }
@@ -342,7 +358,20 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
               </div>
               <div>
                 <label className="field-label">Email Address *</label>
-                <input type="email" required value={form.email} onChange={(e) => updateField('email', e.target.value)} className="field-input" placeholder="emma@example.com" />
+                <input
+                  type="email" required value={form.email}
+                  onChange={(e) => updateField('email', e.target.value)}
+                  onBlur={() => checkPupilEmail(form.email)}
+                  className="field-input" placeholder="emma@example.com"
+                />
+                {existingPupilEmail === form.email && (
+                  <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 font-medium">
+                    <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10 15a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    This email is already registered as a pupil — sign in instead of submitting a new registration.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="field-label">Phone Number</label>
@@ -465,7 +494,7 @@ export default function PupilInvitePage({ params }: { params: { token: string } 
              <textarea rows={2} value={form.notes} onChange={(e) => updateField('notes', e.target.value)} className="field-input resize-y min-h-[80px]" placeholder="Anything else you'd like your instructor to know?" />
           </div>
 
-          <button type="submit" disabled={submitting} className="btn-primary w-full py-4 text-base">
+          <button type="submit" disabled={submitting || existingPupilEmail === form.email} className="btn-primary w-full py-4 text-base">
             {submitting ? <><span className="spinner" /> Submitting…</> : 'Submit Registration'}
           </button>
         </form>

@@ -30,8 +30,9 @@ final instructorPupilsProvider = FutureProvider<List<Map<String, dynamic>>>((ref
   try {
     final response = await Supabase.instance.client
         .from('instructor_pupil_links')
-        .select('*, pupils!inner(profiles!inner(full_name, email, avatar_url))')
-        .eq('instructor_id', user.id);
+        .select('status, pupils!inner(*)')
+        .eq('instructor_id', user.id)
+        .neq('status', 'revoked');
 
     return List<Map<String, dynamic>>.from(response);
   } catch (e) {
@@ -48,7 +49,7 @@ final instructorLessonsProvider = FutureProvider<List<Map<String, dynamic>>>((re
   try {
     final response = await Supabase.instance.client
         .from('lessons')
-        .select('*, pupils!inner(profiles!inner(full_name))')
+        .select('*, pupils!inner(first_name, last_name)')
         .eq('instructor_id', user.id)
         .order('date', ascending: true);
 
@@ -98,20 +99,40 @@ final instructorEnquiriesProvider = FutureProvider<List<Map<String, dynamic>>>((
   }
 });
 
-// Provider for instructor's payments
+// Provider for instructor's payments (from instructor_payments + all transactions)
 final instructorPaymentsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
   try {
-    final response = await Supabase.instance.client
-        .from('instructor_payments')
-        .select('*')
-        .eq('instructor_id', user.id)
-        .order('created_at', ascending: false);
+    final results = <Map<String, dynamic>>[];
 
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final payments = await Supabase.instance.client
+          .from('instructor_payments')
+          .select('*')
+          .eq('instructor_id', user.id)
+          .order('created_at', ascending: false);
+      results.addAll(List<Map<String, dynamic>>.from(payments));
+    } catch (_) {}
+
+    try {
+      final txns = await Supabase.instance.client
+          .from('transactions')
+          .select('*')
+          .eq('instructor_id', user.id)
+          .order('created_at', ascending: false);
+      results.addAll(List<Map<String, dynamic>>.from(txns));
+    } catch (_) {}
+
+    results.sort((a, b) {
+      final da = a['created_at'] as String? ?? a['date'] as String? ?? '';
+      final db = b['created_at'] as String? ?? b['date'] as String? ?? '';
+      return db.compareTo(da);
+    });
+
+    return results;
   } catch (e) {
     return [];
   }
@@ -126,7 +147,7 @@ final instructorInvoicesProvider = FutureProvider<List<Map<String, dynamic>>>((r
   try {
     final response = await Supabase.instance.client
         .from('invoices')
-        .select('*, pupils!inner(profiles!inner(full_name))')
+        .select('*, pupils!inner(first_name, last_name)')
         .eq('instructor_id', user.id)
         .order('created_at', ascending: false);
 
@@ -240,7 +261,7 @@ final instructorTestReportsProvider = FutureProvider<List<Map<String, dynamic>>>
   try {
     final response = await Supabase.instance.client
         .from('test_reports')
-        .select('*, pupils!inner(profiles!inner(full_name))')
+        .select('*, pupils!inner(first_name, last_name)')
         .eq('instructor_id', user.id)
         .order('test_date', ascending: false);
 
@@ -280,6 +301,54 @@ final bannersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    return [];
+  }
+});
+
+// Provider for pupil by ID
+final pupilByIdProvider = FutureProvider.family<Map<String, dynamic>?, String>((ref, pupilId) async {
+  ref.watch(dataRefreshProvider);
+  try {
+    final response = await Supabase.instance.client
+        .from('pupils')
+        .select('*')
+        .eq('id', pupilId)
+        .single();
+
+    return response;
+  } catch (e) {
+    return null;
+  }
+});
+
+// Provider for pupil's completed unpaid lessons
+final pupilUnpaidLessonsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, pupilId) async {
+  ref.watch(dataRefreshProvider);
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return [];
+
+  try {
+    // Fetch completed unpaid + overdue (past scheduled) lessons
+    final response = await Supabase.instance.client
+        .from('lessons')
+        .select('*')
+        .eq('instructor_id', user.id)
+        .eq('pupil_id', pupilId)
+        .or('and(status.eq.completed,paid.eq.false),status.eq.scheduled')
+        .order('date', ascending: false);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final results = List<Map<String, dynamic>>.from(response);
+
+    // Filter: completed unpaid always included; scheduled only if past or today
+    return results.where((l) {
+      if (l['status'] == 'completed') return true;
+      // scheduled: include only if date is past or today
+      final d = DateTime.parse(l['date'] as String);
+      return !d.isAfter(today);
+    }).toList();
   } catch (e) {
     return [];
   }

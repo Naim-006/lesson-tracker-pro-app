@@ -169,10 +169,12 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
     try {
       final sub = await Supabase.instance.client
           .from('instructor_subscriptions')
-          .select('id')
+          .select('end_date, status')
           .eq('instructor_id', userId)
           .maybeSingle();
-      return sub != null;
+      if (sub == null) return false;
+      final endDate = DateTime.parse(sub['end_date']);
+      return endDate.isAfter(DateTime.now()) && sub['status'] == 'active';
     } catch (_) {
       return false;
     }

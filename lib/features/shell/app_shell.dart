@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/providers/app_state_provider.dart';
-import '../../core/providers/theme_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../activity/activity_screen.dart';
 import '../auth/onboarding_screen.dart';
@@ -13,6 +12,7 @@ import '../diary/diary_screen.dart';
 import '../finances/finances_screen.dart';
 import '../home/home_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../profile/profile_screen.dart';
 import '../pupils/pupils_screen.dart';
 import '../quick_add/quick_add_sheet.dart';
 import 'app_drawer.dart';
@@ -184,10 +184,6 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
         title: const _AppWordmark(),
         actions: [
-          IconButton(
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 20),
-            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-          ),
           Stack(
             children: [
               IconButton(
@@ -218,7 +214,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
             ],
           ),
-          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.sunsetBright.withValues(alpha: 0.15),
+                child: Icon(Icons.person, size: 18, color: AppColors.sunsetBright),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: IndexedStack(

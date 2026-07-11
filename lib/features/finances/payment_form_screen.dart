@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/supabase_instructor_provider.dart';
+import '../../core/services/receipt_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/logger.dart';
 import '../../core/utils/error_handler.dart';
@@ -28,7 +32,9 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   PaymentType _paymentType = PaymentType.individual;
   DateTime _date = DateTime.now();
   String? _category;
-  String? _receiptPath;
+  Uint8List? _receiptBytes;
+  String? _receiptFileName;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -45,14 +51,15 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
+            if (!kIsWeb)
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title: Text(kIsWeb ? 'Choose file' : 'Gallery'),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -63,90 +70,17 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     if (source != null) {
       final image = await _picker.pickImage(source: source);
       if (image != null) {
-        setState(() => _receiptPath = image.path);
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _receiptBytes = bytes;
+          _receiptFileName = image.name.isNotEmpty ? image.name : 'receipt.jpg';
+        });
       }
     }
   }
 
-  void _showNumericKeypad(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Enter Amount'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            Text(
-              _amount.text.isEmpty ? '£0.00' : '£${_amount.text}',
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 3,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              children: [
-                _KeypadButton('1', () => _updateAmount('1')),
-                _KeypadButton('2', () => _updateAmount('2')),
-                _KeypadButton('3', () => _updateAmount('3')),
-                _KeypadButton('4', () => _updateAmount('4')),
-                _KeypadButton('5', () => _updateAmount('5')),
-                _KeypadButton('6', () => _updateAmount('6')),
-                _KeypadButton('7', () => _updateAmount('7')),
-                _KeypadButton('8', () => _updateAmount('8')),
-                _KeypadButton('9', () => _updateAmount('9')),
-                _KeypadButton('.', () => _updateAmount('.')),
-                _KeypadButton('0', () => _updateAmount('0')),
-                _KeypadButton('⌫', () => _backspace()),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Done'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        ),
-      ),
-    );
-  }
-
-  void _updateAmount(String value) {
-    setState(() {
-      if (_amount.text.isEmpty && value == '.') {
-        _amount.text = '0.';
-      } else {
-        _amount.text += value;
-      }
-    });
-  }
-
-  void _backspace() {
-    setState(() {
-      if (_amount.text.isNotEmpty) {
-        _amount.text = _amount.text.substring(0, _amount.text.length - 1);
-      }
-    });
-  }
-
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _saving) return;
 
     final amt = double.tryParse(_amount.text);
     if (amt == null || amt <= 0) {
@@ -157,18 +91,39 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
+    setState(() => _saving = true);
+
     try {
-      await Supabase.instance.client.from('payments').insert({
+      final result = await Supabase.instance.client.from('transactions').insert({
         'instructor_id': user.id,
         'pupil_id': _pupil?.id,
+        'pupil_name': _pupil?.fullName ?? 'General',
         'amount': amt,
         'description': _paymentType == PaymentType.block
             ? 'Block payment — ${_pupil?.fullName ?? "General"}'
             : 'Payment — ${_pupil?.fullName ?? "General"}',
         'payment_method': _mapPaymentMethod(_method),
-        'type': _mapPaymentType(_paymentType),
-        'status': 'completed',
-      });
+        'type': 'income',
+        'payment_type': _mapPaymentType(_paymentType),
+        'date': DateFormat('yyyy-MM-dd').format(_date),
+      }).select('id').single();
+
+      final txId = result['id'] as String;
+
+      if (_receiptBytes != null) {
+        final storagePath = await ReceiptStorageService.uploadReceipt(
+          instructorId: user.id,
+          transactionId: txId,
+          bytes: _receiptBytes!,
+          fileName: _receiptFileName ?? 'receipt.jpg',
+        );
+        if (storagePath != null) {
+          await Supabase.instance.client
+              .from('transactions')
+              .update({'receipt_url': storagePath})
+              .eq('id', txId);
+        }
+      }
 
       if (mounted) {
         ref.invalidate(instructorPaymentsProvider);
@@ -185,6 +140,8 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
           SnackBar(content: Text(userFriendlyError(e))),
         );
       }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -193,8 +150,12 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       case PaymentMethod.cash: return 'cash';
       case PaymentMethod.bankTransfer: return 'bank_transfer';
       case PaymentMethod.card: return 'card';
+      case PaymentMethod.cheque: return 'cheque';
+      case PaymentMethod.paypal: return 'paypal';
       case PaymentMethod.online: return 'online';
-      default: return 'bank_transfer';
+      case PaymentMethod.revolut: return 'revolut';
+      case PaymentMethod.monzo: return 'monzo';
+      case PaymentMethod.stripe: return 'stripe';
     }
   }
 
@@ -211,17 +172,18 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
 
     // Convert Supabase data to local Pupil models
     final pupils = instructorPupils.value?.map((link) {
-      final pupilData = link['pupils'];
-      final profile = pupilData?['profiles'];
+      final pupilData = link['pupils'] ?? <String, dynamic>{};
       return Pupil(
         id: pupilData['id'],
-        firstName: profile?['full_name']?.split(' ').first ?? '',
-        lastName: profile?['full_name']?.split(' ').last ?? '',
-        phone: profile?['phone'] ?? '',
-        email: profile?['email'] ?? '',
+        firstName: pupilData['first_name'] ?? '',
+        lastName: pupilData['last_name'] ?? '',
+        phone: pupilData['phone'] ?? '',
+        email: pupilData['email'] ?? '',
         postcode: pupilData['postcode'],
-        pickupAddresses: pupilData['address'] != null ? [pupilData['address']] : [],
-        hourlyRate: 40.0,
+        pickupAddresses: pupilData['pickup_addresses'] != null
+            ? List<String>.from(pupilData['pickup_addresses'])
+            : [],
+        hourlyRate: (pupilData['hourly_rate'] as num?)?.toDouble() ?? 40.0,
       );
     }).toList() ?? [];
 
@@ -242,7 +204,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: TextButton(
-              onPressed: _save,
+              onPressed: _saving ? null : _save,
               child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ),
@@ -303,24 +265,28 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (_receiptPath != null)
+                  if (_receiptBytes != null)
                     Container(
-                      height: 100,
+                      height: 120,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      clipBehavior: Clip.antiAlias,
                       child: Stack(
+                        fit: StackFit.expand,
                         children: [
-                          Center(
-                            child: Icon(Icons.image, size: 48, color: Colors.grey.shade400),
-                          ),
+                          Image.memory(_receiptBytes!, fit: BoxFit.cover),
                           Positioned(
-                            top: 8,
-                            right: 8,
+                            top: 4,
+                            right: 4,
                             child: IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => setState(() => _receiptPath = null),
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                              onPressed: () => setState(() {
+                                _receiptBytes = null;
+                                _receiptFileName = null;
+                              }),
                             ),
                           ),
                         ],
@@ -388,11 +354,9 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      keyboardType: TextInputType.none,
-                      readOnly: true,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
                       textAlign: TextAlign.center,
-                      onTap: () => _showNumericKeypad(context),
                     ),
                   ),
                 ],
@@ -632,7 +596,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
                 ],
               ),
               child: FilledButton(
-                onPressed: _save,
+                onPressed: _saving ? null : _save,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   padding: const EdgeInsets.symmetric(vertical: 18),
@@ -649,30 +613,4 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   }
 }
 
-class _KeypadButton extends StatelessWidget {
-  const _KeypadButton(this.label, this.onTap);
 
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
-    );
-  }
-}
