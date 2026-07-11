@@ -54,7 +54,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       if (instructorId != null) {
         instructor = await Supabase.instance.client
             .from('profiles')
-            .select('full_name, business_name, phone, email')
+            .select('full_name, business_name, phone, email, payment_info')
             .eq('id', instructorId)
             .maybeSingle();
       }
@@ -128,35 +128,154 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     }
   }
 
-  Future<void> _markRequestPaid(Map<String, dynamic> request) async {
-    try {
-      await Supabase.instance.client.from('transactions').insert({
-        'instructor_id': request['instructor_id'],
-        'pupil_id': user!.id,
-        'pupil_name': _instructorInfo?['full_name'] ?? '',
-        'amount': request['amount'],
-        'description': request['description'] ?? 'Payment request',
-        'date': DateTime.now().toIso8601String().split('T')[0],
-        'type': 'income',
-        'payment_method': 'bank_transfer',
-      });
+  void _showPaymentMethodSheet(Map<String, dynamic>? invoice) {
+    final amount = invoice != null ? (invoice['amount'] as num).toDouble() : 0.0;
+    final desc = invoice?['description']?.toString() ?? 'Payment';
+    final payInfo = _instructorInfo?['payment_info'] as Map<String, dynamic>? ?? {};
 
-      await Supabase.instance.client
-          .from('instructor_payment_requests')
-          .update({'status': 'paid'})
-          .eq('id', request['id']);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollCtrl) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ListView(
+            controller: scrollCtrl,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.payment_rounded, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Make a Payment', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+                        const SizedBox(height: 4),
+                        Text('Choose how to pay your instructor', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.sunsetBright.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(desc, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 4),
+                          Text('Amount due', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                    Text('\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.sunsetBright)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text('Payment Methods', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 14),
+              _PaymentMethodTile(
+                icon: Icons.account_balance_rounded,
+                title: 'Bank Transfer',
+                subtitle: 'Transfer directly to instructor\'s bank account',
+                color: const Color(0xFF3B82F6),
+                details: _bankDetails(payInfo),
+              ),
+              const SizedBox(height: 10),
+              _PaymentMethodTile(
+                icon: Icons.money_rounded,
+                title: 'Cash',
+                subtitle: 'Pay in cash at your next lesson',
+                color: const Color(0xFF10B981),
+                details: 'Pay the exact amount in cash during your next driving lesson.',
+              ),
+              const SizedBox(height: 10),
+              _PaymentMethodTile(
+                icon: Icons.phone_android_rounded,
+                title: 'Mobile Payment',
+                subtitle: 'Pay via Monzo, Starling, Revolut etc.',
+                color: const Color(0xFF8B5CF6),
+                details: 'Use your mobile banking app to transfer to your instructor.',
+              ),
+              if (invoice != null) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _payInvoice(invoice);
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 20),
+                    label: Text('Confirm Payment (\u00a3${amount.toStringAsFixed(2)})'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.sunsetBright,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-      if (!mounted) return;
-      _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment confirmed')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFriendlyError(e))),
-      );
+  String _bankDetails(Map<String, dynamic> payInfo) {
+    final bank = payInfo['bank_name'] as String?;
+    final account = payInfo['account_number'] as String?;
+    final sortCode = payInfo['sort_code'] as String?;
+    final name = payInfo['account_name'] as String?;
+
+    if (bank == null && account == null) {
+      return _instructorInfo?['full_name'] != null
+          ? 'Contact ${_instructorInfo!['full_name']} for their bank transfer details.'
+          : 'Contact your instructor for their bank transfer details.';
     }
+
+    final buf = StringBuffer();
+    if (name != null) buf.writeln('Account Name: $name');
+    if (bank != null) buf.writeln('Bank: $bank');
+    if (sortCode != null) buf.writeln('Sort Code: $sortCode');
+    if (account != null) buf.writeln('Account: $account');
+    return buf.toString().trim();
   }
 
   @override
@@ -174,7 +293,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
           unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: [
-            Tab(text: 'Requests (${_requests.where((r) => r['status'] == 'pending').length})'),
+            const Tab(text: 'Requests'),
             const Tab(text: 'Invoices'),
             const Tab(text: 'History'),
           ],
@@ -184,6 +303,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
           ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
           : Column(
               children: [
+                _buildInstructorPayCard(),
                 _buildSummaryBar(),
                 Expanded(
                   child: TabBarView(
@@ -200,10 +320,48 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     );
   }
 
+  Widget _buildInstructorPayCard() {
+    if (_instructorInfo == null) return const SizedBox.shrink();
+
+    final name = _instructorInfo!['full_name'] as String? ?? 'Your Instructor';
+    final business = _instructorInfo!['business_name'] as String?;
+    final phone = _instructorInfo!['phone'] as String?;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48, height: 48,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)),
+            child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white))),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Pay ${business ?? name}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text(phone ?? 'Driving Instructor', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.8))),
+              ],
+            ),
+          ),
+          Icon(Icons.credit_card_rounded, color: Colors.white.withValues(alpha: 0.8), size: 28),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummaryBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(
         children: [
           Expanded(child: _summaryChip('Pending', '\u00a3${_totalPending.toStringAsFixed(2)}', AppColors.warning, Icons.pending_rounded)),
@@ -224,7 +382,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 22),
+          Icon(icon, color: color, size: 20),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,32 +397,23 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
   }
 
   Widget _buildRequestsTab() {
+    if (_requests.isEmpty) {
+      return _emptyState(Icons.request_page_rounded, 'No payment requests', 'Your instructor will send payment requests here');
+    }
+
     final pending = _requests.where((r) => r['status'] == 'pending').toList();
     final history = _requests.where((r) => r['status'] != 'pending').toList();
-
-    if (_requests.isEmpty) {
-      return _emptyState(Icons.request_page_rounded, 'No payment requests', 'Your instructor will send requests here');
-    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (pending.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text('Pending Requests', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
-          ),
-          ...pending.map((r) => _RequestCard(
-            request: r,
-            onPay: () => _showPayDialog(r, _markRequestPaid),
-          )),
-          if (history.isNotEmpty) const SizedBox(height: 24),
+          _sectionHeader('Pending'),
+          ...pending.map((r) => _RequestCard(request: r)),
+          if (history.isNotEmpty) const SizedBox(height: 20),
         ],
         if (history.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text('History', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
-          ),
+          _sectionHeader('History'),
           ...history.map((r) => _RequestCard(request: r)),
         ],
       ],
@@ -280,7 +429,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       padding: const EdgeInsets.all(16),
       children: _invoices.map((inv) => _InvoiceCard(
         invoice: inv,
-        onPay: inv['status'] == 'pending' ? () => _showPayDialog(inv, _payInvoice) : null,
+        onPay: inv['status'] == 'pending' ? () => _showPaymentMethodSheet(inv) : null,
       )).toList(),
     );
   }
@@ -293,6 +442,13 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: _payments.map((p) => _PaymentCard(payment: p)).toList(),
+    );
+  }
+
+  Widget _sectionHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
     );
   }
 
@@ -313,70 +469,11 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       ),
     );
   }
-
-  void _showPayDialog(Map<String, dynamic> item, Function(Map<String, dynamic>) onPay) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.payment_rounded, color: AppColors.sunsetBright, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Text('Confirm Payment', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('\u00a3${(item['amount'] as num).toStringAsFixed(2)}',
-                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.sunsetBright)),
-            const SizedBox(height: 8),
-            if (item['description'] != null && item['description'].toString().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(item['description'].toString(), style: TextStyle(fontSize: 14, color: Colors.grey.shade600), textAlign: TextAlign.center),
-              ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.amber, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('This records the payment. Transfer the amount to your instructor using their bank details.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onPay(item);
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
-            child: const Text('Confirm Paid'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.request, this.onPay});
+  const _RequestCard({required this.request});
   final Map<String, dynamic> request;
-  final VoidCallback? onPay;
 
   Color _statusColor(String? status) {
     switch (status) {
@@ -395,77 +492,53 @@ class _RequestCard extends StatelessWidget {
     final date = DateTime.tryParse(request['created_at'] ?? '');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
         border: status == 'pending'
-            ? Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.3), width: 1.5)
+            ? Border.all(color: AppColors.warning.withValues(alpha: 0.3))
             : null,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Icon(
-                  status == 'paid' ? Icons.check_circle_rounded
-                      : status == 'rejected' ? Icons.cancel_rounded
-                      : Icons.pending_rounded,
-                  color: color, size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('\u00a3${(request['amount'] as num).toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 2),
-                    if (request['description'] != null && request['description'].toString().isNotEmpty)
-                      Text(request['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(
+              status == 'paid' ? Icons.check_circle_rounded
+                  : status == 'rejected' ? Icons.cancel_rounded
+                  : Icons.pending_rounded,
+              color: color, size: 22,
+            ),
           ),
-          if (date != null) ...[
-            const SizedBox(height: 8),
-            Row(
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.calendar_today_rounded, size: 12, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                Text('\u00a3${(request['amount'] as num).toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                if (request['description'] != null && request['description'].toString().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(request['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                if (date != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ),
               ],
             ),
-          ],
-          if (onPay != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: onPay,
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: const Text('Mark as Paid'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-          ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+            child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
+          ),
         ],
       ),
     );
@@ -480,7 +553,6 @@ class _InvoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = invoice['status'] as String? ?? 'pending';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final dueDate = invoice['due_date'] != null ? DateTime.tryParse(invoice['due_date'].toString()) : null;
 
     Color statusColor;
@@ -495,51 +567,54 @@ class _InvoiceCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('\u00a3${(invoice['amount'] as num).toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
-              ),
-            ],
-          ),
-          if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(invoice['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              if (dueDate != null) ...[
-                Icon(Icons.event_rounded, size: 14, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text('Due: ${DateFormat('d MMM yyyy').format(dueDate)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                const Spacer(),
-              ],
-              if (onPay != null)
-                FilledButton(
-                  onPressed: onPay,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.sunsetBright,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w700)),
+      child: InkWell(
+        onTap: onPay,
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('\u00a3${(invoice['amount'] as num).toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
                 ),
+              ],
+            ),
+            if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(invoice['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             ],
-          ),
-        ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (dueDate != null) ...[
+                  Icon(Icons.event_rounded, size: 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Text('Due: ${DateFormat('d MMM yyyy').format(dueDate)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                  const Spacer(),
+                ],
+                if (onPay != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.sunsetBright,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text('Pay', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -582,6 +657,48 @@ class _PaymentCard extends StatelessWidget {
             ),
           ),
           Text('-\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.success)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentMethodTile extends StatelessWidget {
+  const _PaymentMethodTile({required this.icon, required this.title, required this.subtitle, required this.color, required this.details});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final String details;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(details, style: const TextStyle(fontSize: 13, height: 1.5)),
+          ),
         ],
       ),
     );
