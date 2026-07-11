@@ -12,6 +12,7 @@ class SlotRequestScreen extends StatefulWidget {
 class _SlotRequestScreenState extends State<SlotRequestScreen> {
   final user = Supabase.instance.client.auth.currentUser;
   List<Map<String, dynamic>> _availableSlots = [];
+  String? _instructorId;
   Map<String, dynamic>? _linkedInstructor;
   bool _isLoading = true;
 
@@ -28,7 +29,7 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
       // Get linked instructor
       final linkResponse = await Supabase.instance.client
           .from('instructor_pupil_links')
-          .select('instructor_id, instructors!inner(profiles!inner(full_name, business_name))')
+          .select('instructor_id')
           .eq('pupil_id', user!.id)
           .eq('status', 'active')
           .maybeSingle();
@@ -40,14 +41,19 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
         return;
       }
 
-      final instructorId = linkResponse['instructor_id'];
-      _linkedInstructor = linkResponse['instructors'];
+      _instructorId = linkResponse['instructor_id'] as String;
+      final iId = _instructorId!;
+      _linkedInstructor = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name, business_name')
+          .eq('id', iId)
+          .single();
 
       // Load available slots
       final slotsResponse = await Supabase.instance.client
           .from('open_slots')
           .select('*')
-          .eq('instructor_id', instructorId)
+          .eq('instructor_id', iId)
           .eq('is_booked', false)
           .gte('date', DateTime.now().toIso8601String().split('T')[0])
           .order('date', ascending: true);
@@ -86,7 +92,7 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
       // Create lesson record
       final slot = _availableSlots.firstWhere((s) => s['id'] == slotId);
       await Supabase.instance.client.from('lessons').insert({
-        'instructor_id': _linkedInstructor!['id'],
+        'instructor_id': _instructorId,
         'pupil_id': user!.id,
         'date': slot['date'],
         'time': slot['start_time'],

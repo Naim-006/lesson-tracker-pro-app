@@ -38,15 +38,24 @@ class _PupilSettingsScreenState extends ConsumerState<PupilSettingsScreen> {
 
       final linkRes = await Supabase.instance.client
           .from('instructor_pupil_links')
-          .select('instructors:profiles!instructor_id(full_name, business_name, phone, email)')
+          .select('instructor_id')
           .eq('pupil_id', user.id)
           .eq('status', 'active')
           .maybeSingle();
 
+      Map<String, dynamic>? instructor;
+      if (linkRes != null) {
+        instructor = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, business_name, phone, email')
+            .eq('id', linkRes['instructor_id'])
+            .single();
+      }
+
       if (mounted) {
         setState(() {
           _profile = profileRes;
-          _instructor = linkRes?['instructors'] as Map<String, dynamic>?;
+          _instructor = instructor;
           _loading = false;
         });
       }

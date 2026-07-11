@@ -28,7 +28,7 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
     try {
       final linkRes = await Supabase.instance.client
           .from('instructor_pupil_links')
-          .select('instructor_id, instructors:profiles!instructor_id(full_name, avatar_url, business_name)')
+          .select('instructor_id')
           .eq('pupil_id', user!.id)
           .eq('status', 'active')
           .maybeSingle();
@@ -39,7 +39,11 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
       }
 
       final instructorId = linkRes['instructor_id'] as String;
-      final instructor = linkRes['instructors'] as Map<String, dynamic>?;
+      final instructor = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name, avatar_url, business_name')
+          .eq('id', instructorId)
+          .single();
 
       // Fetch last message with this instructor
       final lastMsg = await Supabase.instance.client
@@ -52,7 +56,7 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
 
       if (mounted) {
         setState(() {
-          _instructor = instructor ?? {'full_name': 'Instructor'};
+          _instructor = instructor;
           _instructor!['id'] = instructorId;
           _lastMessage = lastMsg?['content']?.toString();
           _isLoading = false;
