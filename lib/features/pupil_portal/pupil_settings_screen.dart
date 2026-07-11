@@ -49,7 +49,7 @@ class _PupilSettingsScreenState extends ConsumerState<PupilSettingsScreen> {
             .from('profiles')
             .select('full_name, business_name, phone, email')
             .eq('id', linkRes['instructor_id'])
-            .single();
+            .maybeSingle();
       }
 
       if (mounted) {

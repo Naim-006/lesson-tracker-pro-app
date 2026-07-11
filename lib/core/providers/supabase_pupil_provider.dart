@@ -13,7 +13,7 @@ final pupilProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
     return response;
   } catch (e) {
@@ -41,7 +41,9 @@ final pupilInstructorLinkProvider = FutureProvider<Map<String, dynamic>?>((ref) 
         .from('profiles')
         .select('full_name, email, avatar_url, business_name, phone')
         .eq('id', link['instructor_id'])
-        .single();
+        .maybeSingle();
+
+    if (instructor == null) return null;
 
     return {
       ...link,

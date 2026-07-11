@@ -47,7 +47,7 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
           .from('profiles')
           .select('full_name, business_name')
           .eq('id', iId)
-          .single();
+          .maybeSingle();
 
       // Load available slots
       final slotsResponse = await Supabase.instance.client

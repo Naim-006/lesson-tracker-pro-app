@@ -43,7 +43,7 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
           .from('profiles')
           .select('full_name, avatar_url, business_name')
           .eq('id', instructorId)
-          .single();
+          .maybeSingle();
 
       // Fetch last message with this instructor
       final lastMsg = await Supabase.instance.client
