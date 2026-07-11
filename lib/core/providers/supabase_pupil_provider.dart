@@ -30,7 +30,7 @@ final pupilInstructorLinkProvider = FutureProvider<Map<String, dynamic>?>((ref) 
   try {
     final response = await Supabase.instance.client
         .from('instructor_pupil_links')
-        .select('*, instructor:profiles!instructor_id(full_name, email, avatar_url, business_name)')
+        .select('*, instructor:profiles!instructor_id(full_name, email, avatar_url, business_name, phone)')
         .eq('pupil_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
