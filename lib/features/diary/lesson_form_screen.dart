@@ -10,9 +10,10 @@ import '../../core/utils/error_handler.dart';
 import 'location_picker_screen.dart';
 
 class LessonFormScreen extends ConsumerStatefulWidget {
-  const LessonFormScreen({super.key, this.existing});
+  const LessonFormScreen({super.key, this.existing, this.initialPupil});
 
   final Lesson? existing;
+  final Pupil? initialPupil;
 
   @override
   ConsumerState<LessonFormScreen> createState() => _LessonFormScreenState();
@@ -49,6 +50,8 @@ class _LessonFormScreenState extends ConsumerState<LessonFormScreen> {
       _notes.text = e.notes ?? '';
       _recurring = e.isRecurring;
       _shared = e.sharedWithPupil;
+    } else if (widget.initialPupil != null) {
+      _pupil = widget.initialPupil;
     }
   }
 

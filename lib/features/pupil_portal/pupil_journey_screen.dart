@@ -46,7 +46,7 @@ class _PupilJourneyScreenState extends State<PupilJourneyScreen> {
 
       final skillsRes = await Supabase.instance.client
           .from('progress_skills')
-          .select('*, progress_categories!inner(name)')
+          .select('*, progress_categories!inner(title)')
           .eq('pupil_id', _user!.id);
 
       if (mounted) {
@@ -303,7 +303,7 @@ class _PupilJourneyScreenState extends State<PupilJourneyScreen> {
                     child: const Icon(Icons.category_rounded, color: AppColors.sunsetBright, size: 22),
                   ),
                   title: Text(
-                    cat['name'] ?? 'Category',
+                    cat['title'] ?? 'Category',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -363,7 +363,7 @@ class _PupilJourneyScreenState extends State<PupilJourneyScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        skill['skill_name'] ?? '',
+                                        skill['title'] ?? 'Skill',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,

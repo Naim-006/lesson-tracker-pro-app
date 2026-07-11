@@ -154,6 +154,12 @@ class _InstructorAuthScreenState extends State<InstructorAuthScreen> {
       await _secureStorage.delete(key: 'instructor_password');
     }
 
+    // Seed default progress categories (no-op if already seeded)
+    unawaited(Supabase.instance.client.rpc(
+      'seed_default_progress_categories',
+      params: {'p_instructor_id': response.user!.id},
+    ));
+
     if (mounted) {
       final hasSubscription = await _checkSubscription(response.user!.id);
       if (!mounted) return;

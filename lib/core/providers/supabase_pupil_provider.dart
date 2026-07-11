@@ -87,12 +87,12 @@ final pupilProgressSkillsProvider = FutureProvider<List<Map<String, dynamic>>>((
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return [];
 
-  try {
-    final response = await Supabase.instance.client
-        .from('progress_skills')
-        .select('*, progress_categories!inner(name, order_index)')
-        .eq('pupil_id', user.id)
-        .order('progress_categories(order_index)', ascending: true);
+    try {
+      final response = await Supabase.instance.client
+          .from('progress_skills')
+          .select('*, progress_categories!inner(title, order_index)')
+          .eq('pupil_id', user.id)
+          .order('progress_categories(order_index)', ascending: true);
 
     return List<Map<String, dynamic>>.from(response);
   } catch (e) {
