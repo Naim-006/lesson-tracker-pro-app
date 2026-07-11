@@ -21,21 +21,32 @@ final pupilProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
   }
 });
 
-// Provider for pupil's instructor link
+// Provider for pupil's instructor link and profile
 final pupilInstructorLinkProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
   ref.watch(dataRefreshProvider);
   final user = Supabase.instance.client.auth.currentUser;
   if (user == null) return null;
 
   try {
-    final response = await Supabase.instance.client
+    final link = await Supabase.instance.client
         .from('instructor_pupil_links')
-        .select('*, instructors:profiles!instructor_id(full_name, email, avatar_url, business_name, phone)')
+        .select('*')
         .eq('pupil_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
 
-    return response;
+    if (link == null) return null;
+
+    final instructor = await Supabase.instance.client
+        .from('profiles')
+        .select('full_name, email, avatar_url, business_name, phone')
+        .eq('id', link['instructor_id'])
+        .single();
+
+    return {
+      ...link,
+      'instructors': instructor,
+    };
   } catch (e) {
     return null;
   }
