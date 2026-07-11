@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_handler.dart';
@@ -132,15 +134,16 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     final amount = invoice != null ? (invoice['amount'] as num).toDouble() : 0.0;
     final desc = invoice?['description']?.toString() ?? 'Payment';
     final payInfo = _instructorInfo?['payment_info'] as Map<String, dynamic>? ?? {};
+    final phone = _instructorInfo?['phone'] as String? ?? '';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
+        initialChildSize: 0.75,
         minChildSize: 0.5,
-        maxChildSize: 0.9,
+        maxChildSize: 0.95,
         expand: false,
         builder: (_, scrollCtrl) => Container(
           decoration: BoxDecoration(
@@ -151,21 +154,13 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
             controller: scrollCtrl,
             padding: const EdgeInsets.all(24),
             children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 20),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]), borderRadius: BorderRadius.all(Radius.circular(14))),
                     child: const Icon(Icons.payment_rounded, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 14),
@@ -181,14 +176,10 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.sunsetBright.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.15)),
-                ),
+                decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.15))),
                 child: Row(
                   children: [
                     Expanded(
@@ -208,45 +199,20 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
               const SizedBox(height: 24),
               const Text('Payment Methods', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 14),
-              _PaymentMethodTile(
-                icon: Icons.account_balance_rounded,
-                title: 'Bank Transfer',
-                subtitle: 'Transfer directly to instructor\'s bank account',
-                color: const Color(0xFF3B82F6),
-                details: _bankDetails(payInfo),
-              ),
+              _buildBankTransferTile(payInfo),
               const SizedBox(height: 10),
-              _PaymentMethodTile(
-                icon: Icons.money_rounded,
-                title: 'Cash',
-                subtitle: 'Pay in cash at your next lesson',
-                color: const Color(0xFF10B981),
-                details: 'Pay the exact amount in cash during your next driving lesson.',
-              ),
+              _buildCashTile(),
               const SizedBox(height: 10),
-              _PaymentMethodTile(
-                icon: Icons.phone_android_rounded,
-                title: 'Mobile Payment',
-                subtitle: 'Pay via Monzo, Starling, Revolut etc.',
-                color: const Color(0xFF8B5CF6),
-                details: 'Use your mobile banking app to transfer to your instructor.',
-              ),
+              _buildMobilePaymentTile(phone),
               if (invoice != null) ...[
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _payInvoice(invoice);
-                    },
+                    onPressed: () { Navigator.pop(ctx); _payInvoice(invoice); },
                     icon: const Icon(Icons.check_rounded, size: 20),
                     label: Text('Confirm Payment (\u00a3${amount.toStringAsFixed(2)})'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.sunsetBright,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                   ),
                 ),
               ],
@@ -258,24 +224,117 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     );
   }
 
-  String _bankDetails(Map<String, dynamic> payInfo) {
+  Widget _buildBankTransferTile(Map<String, dynamic> payInfo) {
     final bank = payInfo['bank_name'] as String?;
     final account = payInfo['account_number'] as String?;
     final sortCode = payInfo['sort_code'] as String?;
     final name = payInfo['account_name'] as String?;
+    final hasDetails = bank != null || account != null || sortCode != null || name != null;
 
-    if (bank == null && account == null) {
-      return _instructorInfo?['full_name'] != null
-          ? 'Contact ${_instructorInfo!['full_name']} for their bank transfer details.'
-          : 'Contact your instructor for their bank transfer details.';
-    }
+    final items = <_CopyItem>[];
+    if (name != null) items.add(_CopyItem('Account Name', name));
+    if (bank != null) items.add(_CopyItem('Bank', bank));
+    if (sortCode != null) items.add(_CopyItem('Sort Code', sortCode));
+    if (account != null) items.add(_CopyItem('Account Number', account));
 
-    final buf = StringBuffer();
-    if (name != null) buf.writeln('Account Name: $name');
-    if (bank != null) buf.writeln('Bank: $bank');
-    if (sortCode != null) buf.writeln('Sort Code: $sortCode');
-    if (account != null) buf.writeln('Account: $account');
-    return buf.toString().trim();
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF3B82F6).withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.1)),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.account_balance_rounded, color: Color(0xFF3B82F6), size: 22),
+        ),
+        title: const Text('Bank Transfer', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        subtitle: Text(hasDetails ? 'Tap to view & copy bank details' : 'Contact instructor for details', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        children: hasDetails
+            ? items.map((item) => _CopyableRow(label: item.label, value: item.value)).toList()
+            : [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('Contact your instructor for their bank transfer details.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                ),
+              ],
+      ),
+    );
+  }
+
+  Widget _buildCashTile() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.1)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.money_rounded, color: Color(0xFF10B981), size: 22),
+        ),
+        title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        subtitle: Text('Pay the exact amount in cash during your next driving lesson.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+      ),
+    );
+  }
+
+  Widget _buildMobilePaymentTile(String phone) {
+    final canCall = phone.isNotEmpty;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF8B5CF6).withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1)),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.phone_android_rounded, color: Color(0xFF8B5CF6), size: 22),
+        ),
+        title: const Text('Mobile Payment', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        subtitle: Text(canCall ? 'Pay via Monzo, Starling, Revolut & more' : 'Contact instructor', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Use your mobile banking app to transfer to your instructor.', style: TextStyle(fontSize: 13)),
+                if (canCall) ...[
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(10)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.phone_rounded, color: Colors.white, size: 16),
+                          const SizedBox(width: 8),
+                          Text('Call $phone', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -663,41 +722,54 @@ class _PaymentCard extends StatelessWidget {
   }
 }
 
-class _PaymentMethodTile extends StatelessWidget {
-  const _PaymentMethodTile({required this.icon, required this.title, required this.subtitle, required this.color, required this.details});
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final String details;
+class _CopyItem {
+  final String label;
+  final String value;
+  _CopyItem(this.label, this.value);
+}
+
+class _CopyableRow extends StatelessWidget {
+  const _CopyableRow({required this.label, required this.value});
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.1)),
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(10),
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            flex: 3,
+            child: InkWell(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('$label copied'), duration: const Duration(seconds: 1)),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, letterSpacing: 0.5)),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.copy_rounded, size: 14, color: Colors.grey.shade500),
+                  ],
+                ),
+              ),
             ),
-            child: Text(details, style: const TextStyle(fontSize: 13, height: 1.5)),
           ),
         ],
       ),
