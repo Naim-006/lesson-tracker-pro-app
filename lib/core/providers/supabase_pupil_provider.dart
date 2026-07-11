@@ -219,6 +219,65 @@ final pupilTeachingResourcesProvider = FutureProvider<List<Map<String, dynamic>>
   }
 });
 
+// Provider for pupil's instructor vehicles
+final pupilInstructorVehiclesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(dataRefreshProvider);
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return [];
+
+  try {
+    // Get instructor id from link
+    final link = await Supabase.instance.client
+        .from('instructor_pupil_links')
+        .select('instructor_id')
+        .eq('pupil_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+    if (link == null) return [];
+
+    final response = await Supabase.instance.client
+        .from('vehicles')
+        .select('*')
+        .eq('instructor_id', link['instructor_id'])
+        .order('is_primary', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    return [];
+  }
+});
+
+// Provider for pupil's lesson stats (summary counts)
+final pupilLessonStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  ref.watch(dataRefreshProvider);
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return {'total': 0, 'completed': 0, 'hours': 0.0, 'spent': 0.0};
+
+  try {
+    final response = await Supabase.instance.client
+        .from('lessons')
+        .select('date, duration, status, rate')
+        .eq('pupil_id', user.id);
+
+    final lessons = List<Map<String, dynamic>>.from(response);
+    final completed = lessons.where((l) => l['status'] == 'completed').toList();
+    final totalHours = completed.fold<double>(
+      0, (s, l) => s + ((l['duration'] as int? ?? 0) / 60.0));
+    final totalSpent = completed.fold<double>(
+      0, (s, l) => s + ((l['rate'] as num?)?.toDouble() ?? 0));
+
+    return {
+      'total': lessons.length,
+      'completed': completed.length,
+      'hours': totalHours,
+      'spent': totalSpent,
+    };
+  } catch (e) {
+    return {'total': 0, 'completed': 0, 'hours': 0.0, 'spent': 0.0};
+  }
+});
+
 // Provider for pupil's test reports
 final pupilTestReportsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   ref.watch(dataRefreshProvider);

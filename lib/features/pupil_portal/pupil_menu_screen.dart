@@ -8,6 +8,7 @@ import 'pupil_payment_screen.dart';
 import 'pupil_resources_screen.dart';
 import 'pupil_test_reports_screen.dart';
 import 'pupil_lessons_screen.dart';
+import 'pupil_instructor_screen.dart';
 
 class PupilMenuScreen extends StatefulWidget {
   const PupilMenuScreen({super.key});
@@ -65,6 +66,7 @@ class _PupilMenuScreenState extends State<PupilMenuScreen> {
 
           // Account section
           _buildSection('Account', [
+            _MenuItem(icon: Icons.person_rounded, label: 'My Instructor', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilInstructorScreen()))),
             _MenuItem(icon: Icons.calendar_month_rounded, label: 'My Lessons', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilLessonsScreen()))),
             _MenuItem(icon: Icons.payment_rounded, label: 'Payments', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilPaymentScreen()))),
             _MenuItem(icon: Icons.receipt_long_rounded, label: 'Resources', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PupilResourcesScreen()))),
