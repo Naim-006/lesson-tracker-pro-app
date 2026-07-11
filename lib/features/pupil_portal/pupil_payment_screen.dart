@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/error_handler.dart';
 
 class PupilPaymentScreen extends StatefulWidget {
   const PupilPaymentScreen({super.key});
@@ -9,363 +12,104 @@ class PupilPaymentScreen extends StatefulWidget {
   State<PupilPaymentScreen> createState() => _PupilPaymentScreenState();
 }
 
-class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
+class _PupilPaymentScreenState extends State<PupilPaymentScreen>
+    with SingleTickerProviderStateMixin {
   final user = Supabase.instance.client.auth.currentUser;
+  late TabController _tabCtrl;
+
+  List<Map<String, dynamic>> _requests = [];
   List<Map<String, dynamic>> _invoices = [];
   List<Map<String, dynamic>> _payments = [];
-  Map<String, dynamic>? _instructorPaymentInfo;
+  Map<String, dynamic>? _instructorInfo;
   bool _isLoading = true;
-  String _selectedTab = 'invoices';
 
   @override
   void initState() {
     super.initState();
+    _tabCtrl = TabController(length: 3, vsync: this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     if (user == null) return;
+    setState(() => _isLoading = true);
 
     try {
-      // Load invoices for this pupil
-      final invoicesResponse = await Supabase.instance.client
-          .from('invoices')
-          .select('*, profiles!instructor_id(full_name, phone, email)')
-          .eq('pupil_id', user!.id)
-          .order('created_at', ascending: false);
-
-      // Load payment transactions for this pupil
-      final paymentsResponse = await Supabase.instance.client
-          .from('transactions')
-          .select('*')
-          .eq('pupil_id', user!.id)
-          .order('date', ascending: false);
-
-      // Load instructor's payment info (bank info for pupils to pay)
-      // First find who this pupil's instructor is via instructor_pupil_links
-      final linkResponse = await Supabase.instance.client
+      final linkRes = await Supabase.instance.client
           .from('instructor_pupil_links')
-          .select('instructor_id, profiles!instructor_id(full_name, phone, email, business_name)')
+          .select('instructor_id')
           .eq('pupil_id', user!.id)
           .eq('status', 'active')
           .maybeSingle();
 
-      setState(() {
-        _invoices = List<Map<String, dynamic>>.from(invoicesResponse);
-        _payments = List<Map<String, dynamic>>.from(paymentsResponse);
-        _instructorPaymentInfo = linkResponse?['profiles'];
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      final instructorId = linkRes?['instructor_id'] as String?;
+
+      Map<String, dynamic>? instructor;
+      if (instructorId != null) {
+        instructor = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, business_name, phone, email')
+            .eq('id', instructorId)
+            .maybeSingle();
+      }
+
+      final requestsRes = await Supabase.instance.client
+          .from('instructor_payment_requests')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+
+      final invoicesRes = await Supabase.instance.client
+          .from('invoices')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+
+      final paymentsRes = await Supabase.instance.client
+          .from('transactions')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _instructorInfo = instructor;
+          _requests = List<Map<String, dynamic>>.from(requestsRes);
+          _invoices = List<Map<String, dynamic>>.from(invoicesRes);
+          _payments = List<Map<String, dynamic>>.from(paymentsRes);
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  double _calculateTotalPending() {
-    return _invoices
-        .where((inv) => inv['status'] == 'pending')
-        .fold<double>(0, (sum, inv) => sum + ((inv['amount'] as num?) ?? 0));
-  }
+  double get _totalPending =>
+      _invoices.where((i) => i['status'] == 'pending').fold<double>(0, (s, i) => s + ((i['amount'] as num?)?.toDouble() ?? 0));
 
-  double _calculateTotalPaid() {
-    return _payments
-        .where((pay) => pay['status'] == 'completed' && pay['type'] == 'income')
-        .fold<double>(0, (sum, pay) => sum + (pay['amount'] as num));
-  }
+  double get _totalPaid =>
+      _payments.fold<double>(0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0));
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Payments'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF3751F)))
-          : Column(
-              children: [
-                if (_instructorPaymentInfo != null)
-                  _buildInstructorPayInfo(isDark),
-                _buildSummaryCards(),
-                _buildTabBar(),
-                Expanded(
-                  child: _selectedTab == 'invoices'
-                      ? _buildInvoicesList()
-                      : _buildPaymentsList(),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildInstructorPayInfo(bool isDark) {
-    final info = _instructorPaymentInfo!;
-    final name = info['business_name'] ?? info['full_name'] ?? 'Your Instructor';
-    final phone = info['phone'] ?? '';
-    final email = info['email'] ?? '';
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3751F).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF3751F).withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('How to Pay Your Instructor', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFFF3751F))),
-          const SizedBox(height: 10),
-          Text('Instructor: $name', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          if (phone.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.phone, size: 14, color: Color(0xFFF3751F)),
-                  const SizedBox(width: 6),
-                  Text(phone, style: const TextStyle(fontSize: 13)),
-                ],
-              ),
-            ),
-          if (email.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.email_outlined, size: 14, color: Color(0xFFF3751F)),
-                  const SizedBox(width: 6),
-                  Text(email, style: const TextStyle(fontSize: 13)),
-                ],
-              ),
-            ),
-          const SizedBox(height: 8),
-          const Text(
-            'Contact your instructor to get their bank transfer or mobile banking details (e.g. Monzo, Starling, Barclays).',
-            style: TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCards() {
-    final pendingTotal = _calculateTotalPending();
-    final paidTotal = _calculateTotalPaid();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SummaryCard(
-              label: 'Pending',
-              amount: pendingTotal,
-              color: Colors.orange,
-              icon: Icons.pending,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _SummaryCard(
-              label: 'Paid',
-              amount: paidTotal,
-              color: Colors.green,
-              icon: Icons.check_circle,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _TabButton(
-              label: 'Invoices',
-              isSelected: _selectedTab == 'invoices',
-              onTap: () => setState(() => _selectedTab = 'invoices'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _TabButton(
-              label: 'Payment History',
-              isSelected: _selectedTab == 'payments',
-              onTap: () => setState(() => _selectedTab = 'payments'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInvoicesList() {
-    if (_invoices.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.receipt_long,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No Invoices',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'You have no invoices from your instructor',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _invoices.length,
-        itemBuilder: (context, index) {
-          return _InvoiceCard(
-            invoice: _invoices[index],
-            onPay: () => _showPaymentDialog(_invoices[index]),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPaymentsList() {
-    if (_payments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.history,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No Payment History',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _payments.length,
-        itemBuilder: (context, index) {
-          return _PaymentCard(payment: _payments[index]);
-        },
-      ),
-    );
-  }
-
-  void _showPaymentDialog(Map<String, dynamic> invoice) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pay Invoice'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Amount: £${invoice['amount']}',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              invoice['description'] ?? 'Payment for lessons',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            if (invoice['due_date'] != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Due: ${invoice['due_date']}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _processPayment(invoice);
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Pay Now'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _processPayment(Map<String, dynamic> invoice) async {
+  Future<void> _payInvoice(Map<String, dynamic> invoice) async {
     try {
-      // Insert a transaction record for this payment
       await Supabase.instance.client.from('transactions').insert({
         'instructor_id': invoice['instructor_id'],
         'pupil_id': user!.id,
         'pupil_name': invoice['pupil_name'] ?? '',
         'amount': invoice['amount'],
         'description': invoice['description'] ?? 'Invoice payment',
-        'date': DateTime.now().toIso8601String(),
+        'date': DateTime.now().toIso8601String().split('T')[0],
         'type': 'income',
-        'payment_method': 'online',
+        'payment_method': 'bank_transfer',
       });
 
-      // Update invoice status to paid
       await Supabase.instance.client
           .from('invoices')
           .update({'status': 'paid'})
@@ -379,53 +123,249 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(userFriendlyError(e))),
       );
     }
   }
-}
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.label,
-    required this.amount,
-    required this.color,
-    required this.icon,
-  });
+  Future<void> _markRequestPaid(Map<String, dynamic> request) async {
+    try {
+      await Supabase.instance.client.from('transactions').insert({
+        'instructor_id': request['instructor_id'],
+        'pupil_id': user!.id,
+        'pupil_name': _instructorInfo?['full_name'] ?? '',
+        'amount': request['amount'],
+        'description': request['description'] ?? 'Payment request',
+        'date': DateTime.now().toIso8601String().split('T')[0],
+        'type': 'income',
+        'payment_method': 'bank_transfer',
+      });
 
-  final String label;
-  final double amount;
-  final Color color;
-  final IconData icon;
+      await Supabase.instance.client
+          .from('instructor_payment_requests')
+          .update({'status': 'paid'})
+          .eq('id', request['id']);
+
+      if (!mounted) return;
+      _loadData();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment confirmed')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFriendlyError(e))),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Payments'),
+        backgroundColor: AppColors.sunsetBright,
+        foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabCtrl,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          tabs: [
+            Tab(text: 'Requests (${_requests.where((r) => r['status'] == 'pending').length})'),
+            const Tab(text: 'Invoices'),
+            const Tab(text: 'History'),
+          ],
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
+          : Column(
+              children: [
+                _buildSummaryBar(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _buildRequestsTab(),
+                      _buildInvoicesTab(),
+                      _buildHistoryTab(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSummaryBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
+      child: Row(
+        children: [
+          Expanded(child: _summaryChip('Pending', '\u00a3${_totalPending.toStringAsFixed(2)}', AppColors.warning, Icons.pending_rounded)),
+          const SizedBox(width: 12),
+          Expanded(child: _summaryChip('Paid', '\u00a3${_totalPaid.toStringAsFixed(2)}', AppColors.success, Icons.check_circle_rounded)),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryChip(String label, String amount, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              Text(amount, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '£${amount.toStringAsFixed(2)}',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequestsTab() {
+    final pending = _requests.where((r) => r['status'] == 'pending').toList();
+    final history = _requests.where((r) => r['status'] != 'pending').toList();
+
+    if (_requests.isEmpty) {
+      return _emptyState(Icons.request_page_rounded, 'No payment requests', 'Your instructor will send requests here');
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (pending.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text('Pending Requests', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
+          ),
+          ...pending.map((r) => _RequestCard(
+            request: r,
+            onPay: () => _showPayDialog(r, _markRequestPaid),
+          )),
+          if (history.isNotEmpty) const SizedBox(height: 24),
+        ],
+        if (history.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text('History', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
+          ),
+          ...history.map((r) => _RequestCard(request: r)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInvoicesTab() {
+    if (_invoices.isEmpty) {
+      return _emptyState(Icons.receipt_long_rounded, 'No invoices', 'Your instructor hasn\'t sent any invoices yet');
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: _invoices.map((inv) => _InvoiceCard(
+        invoice: inv,
+        onPay: inv['status'] == 'pending' ? () => _showPayDialog(inv, _payInvoice) : null,
+      )).toList(),
+    );
+  }
+
+  Widget _buildHistoryTab() {
+    if (_payments.isEmpty) {
+      return _emptyState(Icons.history_rounded, 'No payment history', 'Your payments will appear here');
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: _payments.map((p) => _PaymentCard(payment: p)).toList(),
+    );
+  }
+
+  Widget _emptyState(IconData icon, String title, String subtitle) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 72, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.grey.shade500)),
+            const SizedBox(height: 8),
+            Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPayDialog(Map<String, dynamic> item, Function(Map<String, dynamic>) onPay) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.payment_rounded, color: AppColors.sunsetBright, size: 20),
             ),
+            const SizedBox(width: 12),
+            const Text('Confirm Payment', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('\u00a3${(item['amount'] as num).toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.sunsetBright)),
+            const SizedBox(height: 8),
+            if (item['description'] != null && item['description'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(item['description'].toString(), style: TextStyle(fontSize: 14, color: Colors.grey.shade600), textAlign: TextAlign.center),
+              ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.amber, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('This records the payment. Transfer the amount to your instructor using their bank details.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onPay(item);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright),
+            child: const Text('Confirm Paid'),
           ),
         ],
       ),
@@ -433,263 +373,217 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _TabButton extends StatelessWidget {
-  const _TabButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+class _RequestCard extends StatelessWidget {
+  const _RequestCard({required this.request, this.onPay});
+  final Map<String, dynamic> request;
+  final VoidCallback? onPay;
 
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'pending': return AppColors.warning;
+      case 'approved': return AppColors.info;
+      case 'paid': return AppColors.success;
+      case 'rejected': return AppColors.error;
+      default: return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.green : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Colors.grey[600],
+    final status = request['status'] as String? ?? 'pending';
+    final color = _statusColor(status);
+    final date = DateTime.tryParse(request['created_at'] ?? '');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
+        border: status == 'pending'
+            ? Border.all(color: AppColors.sunsetBright.withValues(alpha: 0.3), width: 1.5)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(
+                  status == 'paid' ? Icons.check_circle_rounded
+                      : status == 'rejected' ? Icons.cancel_rounded
+                      : Icons.pending_rounded,
+                  color: color, size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('\u00a3${(request['amount'] as num).toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    if (request['description'] != null && request['description'].toString().isNotEmpty)
+                      Text(request['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
+              ),
+            ],
           ),
-          textAlign: TextAlign.center,
-        ),
+          if (date != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.calendar_today_rounded, size: 12, color: Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+              ],
+            ),
+          ],
+          if (onPay != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onPay,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Mark as Paid'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
 class _InvoiceCard extends StatelessWidget {
-  const _InvoiceCard({
-    required this.invoice,
-    required this.onPay,
-  });
-
+  const _InvoiceCard({required this.invoice, this.onPay});
   final Map<String, dynamic> invoice;
-  final VoidCallback onPay;
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'paid':
-        return Colors.green;
-      case 'overdue':
-        return Colors.red;
-      case 'cancelled':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
+  final VoidCallback? onPay;
 
   @override
   Widget build(BuildContext context) {
-    final instructor = invoice['instructors'];
-    final status = invoice['status'];
-    final createdAt = DateTime.parse(invoice['created_at']);
+    final status = invoice['status'] as String? ?? 'pending';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dueDate = invoice['due_date'] != null ? DateTime.tryParse(invoice['due_date'].toString()) : null;
 
-    return Card(
+    Color statusColor;
+    switch (status) {
+      case 'paid': statusColor = AppColors.success; break;
+      case 'overdue': statusColor = AppColors.error; break;
+      case 'cancelled': statusColor = Colors.grey; break;
+      default: statusColor = AppColors.warning;
+    }
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '£${invoice['amount']}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        instructor?['profiles']?['full_name'] ?? 'Instructor',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(status).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _getStatusColor(status),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                invoice['description'],
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('\u00a3${(invoice['amount'] as num).toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
               ),
             ],
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    _formatDate(createdAt),
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (status == 'pending')
-                  FilledButton(
-                    onPressed: onPay,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text('Pay'),
-                  ),
-              ],
-            ),
+          ),
+          if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(invoice['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
           ],
-        ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (dueDate != null) ...[
+                Icon(Icons.event_rounded, size: 14, color: Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text('Due: ${DateFormat('d MMM yyyy').format(dueDate)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                const Spacer(),
+              ],
+              if (onPay != null)
+                FilledButton(
+                  onPressed: onPay,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.sunsetBright,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+        ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) return 'Today';
-    if (difference.inDays == 1) return 'Yesterday';
-    if (difference.inDays < 7) return '${difference.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
   }
 }
 
 class _PaymentCard extends StatelessWidget {
   const _PaymentCard({required this.payment});
-
   final Map<String, dynamic> payment;
-
-  Color _getTypeColor(String type) {
-    switch (type) {
-      case 'income':
-        return Colors.green;
-      case 'expense':
-        return Colors.red;
-      case 'refund':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final createdAt = DateTime.parse(payment['created_at']);
+    final date = DateTime.tryParse(payment['created_at'] ?? payment['date'] ?? '');
+    final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
+    final desc = payment['description'] as String? ?? 'Payment';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _getTypeColor(payment['type']).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                payment['type'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
-                color: _getTypeColor(payment['type']),
-                size: 24,
-              ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkBorder : AppColors.lightBorder, width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(desc, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (date != null)
+                  Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    payment['description'] ?? 'Payment',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    _formatDate(createdAt),
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: Text(
-                '${payment['type'] == 'income' ? '+' : '-'}£${payment['amount']}',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _getTypeColor(payment['type']),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+          ),
+          Text('-\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.success)),
+        ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) return 'Today';
-    if (difference.inDays == 1) return 'Yesterday';
-    if (difference.inDays < 7) return '${difference.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
   }
 }
