@@ -22,7 +22,22 @@ class PupilInstructorScreen extends ConsumerWidget {
       ),
       body: linkAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright)),
-        error: (_, __) => const Center(child: Text('Error loading instructor')),
+        error: (_, __) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text('Could not load instructor info', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: () { ref.invalidate(pupilInstructorLinkProvider); },
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
         data: (link) {
           final instructor = link?['instructors'] as Map<String, dynamic>?;
           if (instructor == null) {
@@ -30,9 +45,15 @@ class PupilInstructorScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.person_off_rounded, size: 64, color: Colors.grey.shade300),
+                  Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey.shade300),
                   const SizedBox(height: 16),
-                  Text('No instructor linked', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                  Text('Could not load data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                  const SizedBox(height: 16),
+                  FilledButton.tonalIcon(
+                    onPressed: () { ref.invalidate(pupilInstructorLinkProvider); },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Retry'),
+                  ),
                 ],
               ),
             );

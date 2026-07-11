@@ -144,36 +144,16 @@ class _SlotRequestScreenState extends State<SlotRequestScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.person_search,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'No Instructor Linked',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Could not load booking data', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text(
-              'Link with an instructor to request slots',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
+            Text('Please try again', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                // Navigate to find tutors
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-              ),
-              child: const Text('Find an Instructor'),
+            FilledButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Retry'),
             ),
           ],
         ),

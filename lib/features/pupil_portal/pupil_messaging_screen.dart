@@ -95,9 +95,15 @@ class _PupilMessagingScreenState extends State<PupilMessagingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.message_outlined, size: 72, color: Colors.grey.shade300),
+                        Icon(Icons.cloud_off_rounded, size: 72, color: Colors.grey.shade300),
                         const SizedBox(height: 16),
-                        Text('No instructor linked', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                        Text('Could not load messages', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
+                        const SizedBox(height: 16),
+                        FilledButton.tonalIcon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Retry'),
+                        ),
                       ],
                     ),
                   ),
