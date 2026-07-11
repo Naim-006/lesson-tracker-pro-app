@@ -19,111 +19,143 @@ class _PupilProgressScreenState extends State<PupilProgressScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadProgressData();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadProgressData() async {
     if (user == null) return;
     try {
-      final link = await Supabase.instance.client
+      final linkResponse = await Supabase.instance.client
           .from('instructor_pupil_links')
           .select('instructor_id')
           .eq('pupil_id', user!.id)
           .eq('status', 'active')
           .maybeSingle();
 
-      if (link == null) { if (mounted) setState(() => _isLoading = false); return; }
+      if (linkResponse == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      final cats = await Supabase.instance.client
+      final instructorId = linkResponse['instructor_id'];
+
+      final categoriesResponse = await Supabase.instance.client
           .from('progress_categories')
           .select('*')
-          .eq('instructor_id', link['instructor_id'])
+          .eq('instructor_id', instructorId)
           .order('order_index', ascending: true);
 
-      final skills = await Supabase.instance.client
+      final skillsResponse = await Supabase.instance.client
           .from('progress_skills')
           .select('*, progress_categories!inner(title)')
           .eq('pupil_id', user!.id);
 
-      if (mounted) setState(() { _categories = List<Map<String, dynamic>>.from(cats); _skills = List<Map<String, dynamic>>.from(skills); _isLoading = false; });
-    } catch (_) { if (mounted) setState(() => _isLoading = false); }
+      if (mounted) {
+        setState(() {
+          _categories = List<Map<String, dynamic>>.from(categoriesResponse);
+          _skills = List<Map<String, dynamic>>.from(skillsResponse);
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  double get _overall {
+  double _overallProgress() {
     if (_skills.isEmpty) return 0.0;
-    return _skills.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0)) / (_skills.length * 5);
+    final total = _skills.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0));
+    return total / (_skills.length * 5);
   }
 
-  List<Map<String, dynamic>> _skillsFor(String catId) => _skills.where((s) => s['category_id'] == catId).toList();
+  List<Map<String, dynamic>> _skillsForCategory(String categoryId) =>
+      _skills.where((s) => s['category_id'] == categoryId).toList();
 
-  double _catProgress(String catId) {
-    final list = _skillsFor(catId);
+  double _categoryProgress(String categoryId) {
+    final list = _skillsForCategory(categoryId);
     if (list.isEmpty) return 0.0;
-    return list.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0)) / (list.length * 5);
+    final total = list.fold<double>(0, (s, sk) => s + ((sk['skill_level'] as int?) ?? 0));
+    return total / (list.length * 5);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final overall = _overall;
+    final overall = _overallProgress();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Progress'),
         backgroundColor: AppColors.sunsetBright,
         foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
           : _categories.isEmpty
-              ? Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.trending_up_rounded, size: 72, color: Colors.grey.shade300),
-                    const SizedBox(height: 16),
-                    Text('No Progress Data', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.grey.shade500)),
-                    const SizedBox(height: 8),
-                    Text('Your instructor will set up skills to track.', style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
-                  ],
-                ))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.trending_up_rounded, size: 72, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text('No Progress Data',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.grey.shade500)),
+                        const SizedBox(height: 8),
+                        Text('Your instructor will assign skills to track.',
+                            style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+                      ],
+                    ),
+                  ),
+                )
               : RefreshIndicator(
-                  onRefresh: _load,
+                  onRefresh: _loadProgressData,
                   color: AppColors.sunsetBright,
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(22),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
+                          color: isDark ? AppColors.darkCard : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 3))],
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              const Text('Overall Progress', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                              Text('${(overall * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -1)),
-                            ]),
-                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Overall Progress', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                                Text('${(overall * 100).toInt()}%',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.sunsetBright)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(6),
                               child: LinearProgressIndicator(
                                 value: overall,
-                                backgroundColor: Colors.white.withValues(alpha: 0.25),
-                                valueColor: const AlwaysStoppedAnimation(Colors.white),
+                                backgroundColor: Colors.grey.shade200,
+                                valueColor: const AlwaysStoppedAnimation(AppColors.sunsetBright),
                                 minHeight: 10,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       ..._categories.map((cat) {
-                        final skills = _skillsFor(cat['id'] as String);
-                        final progress = _catProgress(cat['id'] as String);
-                        return _CatCard(category: cat, progress: progress, skills: skills, isDark: isDark);
+                        final skills = _skillsForCategory(cat['id'] as String);
+                        final progress = _categoryProgress(cat['id'] as String);
+                        return _CategoryCard(
+                          category: cat,
+                          progress: progress,
+                          skills: skills,
+                          isDark: isDark,
+                        );
                       }),
                     ],
                   ),
@@ -132,13 +164,12 @@ class _PupilProgressScreenState extends State<PupilProgressScreen> {
   }
 }
 
-class _CatCard extends StatelessWidget {
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.category, required this.progress, required this.skills, required this.isDark});
   final Map<String, dynamic> category;
   final double progress;
   final List<Map<String, dynamic>> skills;
   final bool isDark;
-
-  const _CatCard({required this.category, required this.progress, required this.skills, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -146,90 +177,107 @@ class _CatCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: Container(
-            width: 46, height: 46,
+            width: 42, height: 42,
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(child: Text(
-              (category['title'] as String? ?? '?')[0].toUpperCase(),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20),
-            )),
+            child: const Icon(Icons.category_rounded, color: Colors.white, size: 20),
           ),
-          title: Text(category['title'] ?? 'Category', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+          title: Text(category['title'] ?? 'Category',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 6, bottom: 6),
             child: Row(
               children: [
-                Expanded(child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade200, valueColor: const AlwaysStoppedAnimation(AppColors.sunsetBright), minHeight: 6),
-                )),
-                const SizedBox(width: 12),
-                Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.sunsetBright)),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation(AppColors.sunsetBright),
+                      minHeight: 5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('${(progress * 100).toInt()}%',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.sunsetBright)),
               ],
             ),
           ),
           children: skills.isEmpty
-              ? [const Padding(padding: EdgeInsets.all(12), child: Text('No skills', style: TextStyle(color: Colors.grey)))]
-              : skills.map((s) {
-                  final level = (s['skill_level'] as int?) ?? 0;
-                  final practiced = s['last_practiced'];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              ? [const Padding(padding: EdgeInsets.all(16), child: Text('No skills', style: TextStyle(color: Colors.grey)))]
+              : [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      children: skills.map((skill) {
+                        final level = (skill['skill_level'] as int?) ?? 0;
+                        final practiced = skill['last_practiced'];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
                             children: [
-                              Text(s['title'] ?? 'Skill', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
-                              if (practiced != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text('Practiced: ${_formatDate(practiced.toString())}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(skill['title'] ?? 'Skill',
+                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                                    if (practiced != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text('Last practiced: ${_formatDate(practiced.toString())}',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                                    ],
+                                  ],
                                 ),
+                              ),
+                              Row(
+                                children: List.generate(5, (i) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 3),
+                                    child: Icon(
+                                      i < level ? Icons.star_rounded : Icons.star_border_rounded,
+                                      size: 18,
+                                      color: i < level ? const Color(0xFFFBBF24) : Colors.grey.shade300,
+                                    ),
+                                  );
+                                }),
+                              ),
                             ],
                           ),
-                        ),
-                        Row(
-                          children: List.generate(5, (i) {
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 3),
-                              child: Icon(i < level ? Icons.star_rounded : Icons.star_border_rounded, size: 20, color: i < level ? const Color(0xFFFBBF24) : Colors.grey.shade300),
-                            );
-                          }),
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
-                  );
-                }).toList(),
+                  ),
+                ],
         ),
       ),
     );
   }
 
-  String _formatDate(String d) {
-    final dt = DateTime.tryParse(d);
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
+  String _formatDate(String dateString) {
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return '';
+    final diff = DateTime.now().difference(date);
     if (diff.inDays == 0) return 'Today';
     if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${dt.day}/${dt.month}/${dt.year}';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
