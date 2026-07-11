@@ -43,6 +43,8 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
   Future<void> _loadAll() async {
     if (user == null) return;
     setState(() => _isLoading = true);
+
+    // Step 1: Get instructor link
     try {
       final link = await Supabase.instance.client
           .from('instructor_pupil_links')
@@ -50,58 +52,59 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
           .eq('pupil_id', user!.id)
           .eq('status', 'active')
           .maybeSingle();
-
       _instructorId = link?['instructor_id'] as String?;
+    } catch (_) { _instructorId = null; }
 
-      // Fetch instructor profile
-      _instructor = _instructorId != null
-          ? await Supabase.instance.client
-              .from('profiles')
-              .select('full_name, business_name, phone, email')
-              .eq('id', _instructorId!)
-              .maybeSingle()
-          : null;
+    // Step 2: Get instructor profile (independent)
+    if (_instructorId != null) {
+      try {
+        _instructor = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, business_name, phone, email')
+            .eq('id', _instructorId!)
+            .maybeSingle();
+      } catch (_) { _instructor = null; }
 
-      // Fetch instructor payment methods
-      if (_instructorId != null) {
+      // Step 3: Get instructor payment info (independent — don't let this break everything)
+      try {
         final payInfo = await Supabase.instance.client
             .from('instructor_payment_info')
             .select('methods')
             .eq('instructor_id', _instructorId!)
             .maybeSingle();
         _payMethods = (payInfo?['methods'] as Map?)?.cast<String, dynamic>() ?? {};
-      }
-
-      // Fetch data in parallel
-      final results = await Future.wait([
-        Supabase.instance.client
-            .from('instructor_payment_requests')
-            .select('*')
-            .eq('pupil_id', user!.id)
-            .order('created_at', ascending: false),
-        Supabase.instance.client
-            .from('invoices')
-            .select('*')
-            .eq('pupil_id', user!.id)
-            .order('created_at', ascending: false),
-        Supabase.instance.client
-            .from('transactions')
-            .select('*')
-            .eq('pupil_id', user!.id)
-            .order('created_at', ascending: false),
-      ]);
-
-      if (mounted) {
-        setState(() {
-          _requests = List<Map<String, dynamic>>.from(results[0]);
-          _invoices = List<Map<String, dynamic>>.from(results[1]);
-          _payments = List<Map<String, dynamic>>.from(results[2]);
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      } catch (_) { _payMethods = {}; }
     }
+
+    // Step 4: Load each data type independently
+    try {
+      final r = await Supabase.instance.client
+          .from('instructor_payment_requests')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+      _requests = List<Map<String, dynamic>>.from(r);
+    } catch (_) { _requests = []; }
+
+    try {
+      final r = await Supabase.instance.client
+          .from('invoices')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+      _invoices = List<Map<String, dynamic>>.from(r);
+    } catch (_) { _invoices = []; }
+
+    try {
+      final r = await Supabase.instance.client
+          .from('transactions')
+          .select('*')
+          .eq('pupil_id', user!.id)
+          .order('created_at', ascending: false);
+      _payments = List<Map<String, dynamic>>.from(r);
+    } catch (_) { _payments = []; }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   double get _totalPending => _invoices
