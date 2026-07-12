@@ -27,6 +27,14 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
   String? _instructorId;
   bool _isLoading = true;
 
+  static const _methodMeta = {
+    'bank_transfer': ('Bank Transfer', Icons.account_balance_rounded, Color(0xFF3B82F6)),
+    'paypal': ('PayPal', Icons.account_balance_wallet_rounded, Color(0xFF0070BA)),
+    'revolut': ('Revolut', Icons.currency_exchange_rounded, Color(0xFF0075EB)),
+    'monzo': ('Monzo', Icons.credit_card_rounded, Color(0xFFFFA500)),
+    'starling': ('Starling Bank', Icons.savings_rounded, Color(0xFF6938D9)),
+  };
+
   @override
   void initState() {
     super.initState();
@@ -40,11 +48,12 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     super.dispose();
   }
 
+  // ─── DATA LOADING (each query independent) ──────────────────
   Future<void> _loadAll() async {
     if (user == null) return;
     setState(() => _isLoading = true);
 
-    // Step 1: Get instructor link
+    // 1. Link
     try {
       final link = await Supabase.instance.client
           .from('instructor_pupil_links')
@@ -55,7 +64,8 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       _instructorId = link?['instructor_id'] as String?;
     } catch (_) { _instructorId = null; }
 
-    // Step 2: Get instructor profile (includes payment_info JSONB)
+    // 2. Instructor profile + payment_info JSONB
+    _payMethods = {};
     if (_instructorId != null) {
       try {
         _instructor = await Supabase.instance.client
@@ -65,22 +75,21 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
             .maybeSingle();
       } catch (_) { _instructor = null; }
 
-      // Source 1: Always read profiles.payment_info JSONB (instructor sets this in Settings)
-      _payMethods = {};
+      // Source 1: profiles.payment_info JSONB
       if (_instructor != null) {
         final pi = (_instructor!['payment_info'] as Map?)?.cast<String, dynamic>() ?? {};
         if (pi['account_number'] != null && (pi['account_number'] as String).isNotEmpty) {
           _payMethods['bank_transfer'] = {
             'enabled': true,
+            'holder_name': pi['account_name'] ?? _instructor!['full_name'] ?? '',
             'bank_name': pi['bank_name'] ?? '',
             'sort_code': pi['sort_code'] ?? '',
             'account_number': pi['account_number'] ?? '',
-            'account_name': _instructor!['full_name'] ?? '',
           };
         }
       }
 
-      // Source 2: Also try instructor_payment_info table (multiple methods) — may not exist
+      // Source 2: instructor_payment_info table (merge over profile data)
       try {
         final payInfo = await Supabase.instance.client
             .from('instructor_payment_info')
@@ -91,10 +100,10 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
           final tm = (payInfo!['methods'] as Map).cast<String, dynamic>();
           _payMethods.addAll(tm);
         }
-      } catch (_) { /* table might not exist — profile data already loaded */ }
+      } catch (_) {/* table might not exist */}
     }
 
-    // Step 4: Load each data type independently
+    // 3. Requests
     try {
       final r = await Supabase.instance.client
           .from('instructor_payment_requests')
@@ -104,6 +113,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       _requests = List<Map<String, dynamic>>.from(r);
     } catch (_) { _requests = []; }
 
+    // 4. Invoices
     try {
       final r = await Supabase.instance.client
           .from('invoices')
@@ -113,6 +123,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       _invoices = List<Map<String, dynamic>>.from(r);
     } catch (_) { _invoices = []; }
 
+    // 5. Transactions
     try {
       final r = await Supabase.instance.client
           .from('transactions')
@@ -125,12 +136,45 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     if (mounted) setState(() => _isLoading = false);
   }
 
-  double get _totalPending => _invoices
-      .where((i) => i['status'] == 'pending')
-      .fold<double>(0, (s, i) => s + ((i['amount'] as num?)?.toDouble() ?? 0));
+  // List of enabled methods
+  List<MapEntry<String, Map<String, dynamic>>> get _enabledMethods {
+    final list = <MapEntry<String, Map<String, dynamic>>>[];
+    for (final entry in _payMethods.entries) {
+      final m = entry.value;
+      if (m is Map && m['enabled'] == true) {
+        list.add(MapEntry(entry.key, Map<String, dynamic>.from(m)));
+      }
+    }
+    return list;
+  }
 
-  double get _totalPaid => _payments
-      .fold<double>(0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0));
+  // Extract copyable fields for a method
+  List<_DetailPair> _fieldsForMethod(String key, Map<String, dynamic> m) {
+    final fields = <_DetailPair>[];
+    switch (key) {
+      case 'bank_transfer':
+        if ((m['holder_name'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Account Holder', m['holder_name'].toString()));
+        if ((m['bank_name'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Bank', m['bank_name'].toString()));
+        if ((m['sort_code'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Sort Code', m['sort_code'].toString()));
+        if ((m['account_number'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Account No', m['account_number'].toString()));
+        if ((m['reference'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Reference', m['reference'].toString()));
+      case 'paypal':
+        if ((m['email'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('PayPal Email', m['email'].toString()));
+      case 'revolut':
+        if ((m['revtag'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Revtag', m['revtag'].toString()));
+        if ((m['phone'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Phone', m['phone'].toString()));
+        if ((m['sort_code'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Sort Code', m['sort_code'].toString()));
+        if ((m['account_number'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Account No', m['account_number'].toString()));
+      case 'monzo':
+        if ((m['sort_code'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Sort Code', m['sort_code'].toString()));
+        if ((m['account_number'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Account No', m['account_number'].toString()));
+        if ((m['payment_link'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Payment Link', m['payment_link'].toString()));
+      case 'starling':
+        if ((m['sort_code'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Sort Code', m['sort_code'].toString()));
+        if ((m['account_number'] ?? '').toString().isNotEmpty) fields.add(_DetailPair('Account No', m['account_number'].toString()));
+    }
+    return fields;
+  }
 
   Future<void> _payInvoice(Map<String, dynamic> invoice) async {
     try {
@@ -144,37 +188,18 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
         'type': 'income',
         'payment_method': 'bank_transfer',
       });
-      await Supabase.instance.client
-          .from('invoices')
-          .update({'status': 'paid'})
-          .eq('id', invoice['id']);
+      await Supabase.instance.client.from('invoices').update({'status': 'paid'}).eq('id', invoice['id']);
       if (!mounted) return;
       _loadAll();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment confirmed')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment confirmed')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFriendlyError(e))),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFriendlyError(e))));
     }
   }
 
-  void _showPaymentSheet(Map<String, dynamic>? invoice) {
+  void _showPaySheet(Map<String, dynamic>? invoice) {
     final amount = invoice != null ? (invoice['amount'] as num).toDouble() : 0.0;
-    final dollarFormat = '\u00a3${amount.toStringAsFixed(2)}';
-    final phone = _instructor?['phone'] as String? ?? '';
-
-    // Get enabled payment methods from instructor data
-    final activeMethods = <MapEntry<String, Map<String, dynamic>>>[];
-    for (final entry in _payMethods.entries) {
-      final m = entry.value;
-      if (m is Map && m['enabled'] == true) {
-        activeMethods.add(MapEntry(entry.key, Map<String, dynamic>.from(m)));
-      }
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -195,77 +220,34 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
             children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 20),
-              // Amount header
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Column(
-                      children: [
-                        Text(dollarFormat, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white)),
-                        const SizedBox(height: 4),
-                        Text(invoice?['description']?.toString() ?? 'Payment', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8))),
-                      ],
-                    ),
-                  ],
-                ),
+                decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]), borderRadius: BorderRadius.all(Radius.circular(18))),
+                child: Center(child: Text('\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white))),
               ),
               const SizedBox(height: 24),
-              Text('How to Pay', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-              const SizedBox(height: 4),
-              Text('Tap any detail to copy it', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-              const SizedBox(height: 16),
-              if (activeMethods.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(14)),
-                  child: Column(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.grey.shade400, size: 32),
-                      const SizedBox(height: 12),
-                      Text('Your instructor hasn\'t set up payment methods yet.', style: TextStyle(fontSize: 14, color: Colors.grey.shade600), textAlign: TextAlign.center),
-                      if (phone.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(12)),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.phone_rounded, color: Colors.white, size: 18),
-                                const SizedBox(width: 8),
-                                Text('Call $phone', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+              if (_enabledMethods.isEmpty) ...[
+                _noMethodsMessage(),
+              ] else ...[
+                const Text('Payment Methods', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                const SizedBox(height: 4),
+                Text('Tap any detail to copy', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                const SizedBox(height: 14),
+                ..._enabledMethods.map((e) {
+                  final meta = _methodMeta[e.key] ?? ('Payment', Icons.payment_rounded, Colors.grey);
+                  return _MethodTile(label: meta.$1, icon: meta.$2, color: meta.$3, fields: _fieldsForMethod(e.key, e.value), phone: _instructor?['phone'] as String?);
+                }),
+                if (invoice != null) ...[
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () { Navigator.pop(ctx); _payInvoice(invoice); },
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: Text('I\'ve Paid \u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    ),
                   ),
-                )
-              else
-                ...activeMethods.map((entry) => _PayMethodTile(
-                  methodKey: entry.key,
-                  methodData: entry.value,
-                  phone: phone,
-                )),
-              if (invoice != null && activeMethods.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () { Navigator.pop(ctx); _payInvoice(invoice); },
-                    style: FilledButton.styleFrom(backgroundColor: AppColors.sunsetBright, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                    child: Text('I\'ve Paid $dollarFormat', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  ),
-                ),
+                ],
               ],
               const SizedBox(height: 32),
             ],
@@ -275,6 +257,38 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     );
   }
 
+  Widget _noMethodsMessage() {
+    final phone = _instructor?['phone'] as String? ?? '';
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        children: [
+          Icon(Icons.payment_outlined, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          const Text('No Payment Methods Set Up', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('Your instructor hasn\'t shared any payment details yet. Please contact them to arrange payment.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+          if (phone.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const Icon(Icons.phone_rounded, color: Colors.white, size: 18), const SizedBox(width: 8), Text('Call $phone', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ─── BUILD ──────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -282,7 +296,7 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF6F4F0),
       appBar: AppBar(
-        title: const Text('Payments', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Payments'),
         backgroundColor: AppColors.sunsetBright,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -300,465 +314,282 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
           ? const Center(child: CircularProgressIndicator(color: AppColors.sunsetBright))
           : Column(
               children: [
-                _buildInstructorPayCard(),
+                _buildPaymentInfoSection(),
                 _buildSummaryBar(),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabCtrl,
-                    children: [_buildRequestsTab(), _buildInvoicesTab(), _buildHistoryTab()],
-                  ),
-                ),
+                Expanded(child: TabBarView(controller: _tabCtrl, children: [_buildRequestsTab(), _buildInvoicesTab(), _buildHistoryTab()])),
               ],
             ),
     );
   }
 
-  Widget _buildInstructorPayCard() {
-    if (_instructor == null) return const SizedBox.shrink();
-
-    final name = _instructor!['full_name'] as String? ?? 'Your Instructor';
-    final business = _instructor!['business_name'] as String?;
-    final phone = _instructor!['phone'] as String?;
-
-    final enabledCount = _payMethods.values.where((m) => m is Map && m['enabled'] == true).length;
+  // ─── PAYMENT INFO SECTION (shows all enabled methods) ──────
+  Widget _buildPaymentInfoSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final name = _instructor?['full_name'] as String? ?? 'Your Instructor';
+    final business = _instructor?['business_name'] as String?;
+    final phone = _instructor?['phone'] as String?;
+    final methods = _enabledMethods;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
+        color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.sunsetBright.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)),
-                child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white))),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(business ?? name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Colors.white)),
-                    const SizedBox(height: 2),
-                    Text(enabledCount > 0 ? '$enabledCount payment ${enabledCount == 1 ? 'method' : 'methods'} available' : 'Tap to set up payment', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.8))),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.payment_rounded, color: Colors.white, size: 24),
-              ),
-            ],
-          ),
-          // Bank details section — shown directly on main screen
-          ..._buildBankDetailsSection(phone),
-          if (phone != null && phone.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.phone_rounded, color: Colors.white, size: 16),
-                    const SizedBox(width: 8),
-                    Text(phone, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13, letterSpacing: 0.5)),
-                  ],
-                ),
-              ),
+          // Header
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [AppColors.sunsetBright, Color(0xFFE85D3A)]),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildBankDetailsSection(String? phone) {
-    // Get bank transfer method data
-    final bt = _payMethods['bank_transfer'] as Map<String, dynamic>?;
-    if (bt == null || bt['enabled'] != true) return [];
-
-    final bankName = bt['bank_name'] as String? ?? '';
-    final sortCode = bt['sort_code'] as String? ?? '';
-    final accountNum = bt['account_number'] as String? ?? '';
-    final accountName = bt['account_name'] as String? ?? _instructor?['full_name'] as String? ?? '';
-
-    if (accountNum.isEmpty) return [];
-
-    return [
-      const SizedBox(height: 16),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+            child: Row(
               children: [
-                const Icon(Icons.account_balance_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                const Text('Bank Details', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white)),
-                const Spacer(),
-                const Text('Tap to copy', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)),
+                  child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white))),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(business ?? name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      if (methods.isNotEmpty)
+                        Text('${methods.length} payment ${methods.length == 1 ? 'method' : 'methods'} available', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)))
+                      else
+                        Text('No payment methods set up', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.lock_outline, color: Colors.white70, size: 20),
               ],
             ),
-            const SizedBox(height: 12),
-            if (accountName.isNotEmpty)
-              _bankDetailRow('Account Name', accountName),
-            if (bankName.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _bankDetailRow('Bank', bankName),
-            ],
-            if (sortCode.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _bankDetailRow('Sort Code', sortCode),
-            ],
-            if (accountNum.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _bankDetailRow('Account No', accountNum),
-            ],
-          ],
-        ),
-      ),
-    ];
-  }
-
-  Widget _bankDetailRow(String label, String value) {
-    return InkWell(
-      onTap: () {
-        Clipboard.setData(ClipboardData(text: value));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label copied'), duration: const Duration(seconds: 1)),
-        );
-      },
-      child: Row(
-        children: [
-          SizedBox(width: 88, child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w600))),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
+          ),
+          // Methods
+          if (methods.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
                 children: [
-                  Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white, letterSpacing: 0.5))),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.copy_rounded, size: 12, color: Colors.white70),
+                  Icon(Icons.payment_outlined, size: 40, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  Text('Your instructor hasn\'t shared payment details yet.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                  const SizedBox(height: 4),
+                  Text('Contact them directly to arrange payment.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                  if (phone != null && phone.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    InkWell(
+                      onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(10)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [const Icon(Icons.phone_rounded, color: Colors.white, size: 18), const SizedBox(width: 8), Text('Call $phone', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14))],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-          ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+              child: Row(
+                children: [
+                  Icon(Icons.touch_app_outlined, size: 14, color: Colors.grey.shade400),
+                  const SizedBox(width: 6),
+                  Text('Tap any detail to copy', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                ],
+              ),
+            ),
+            ...methods.map((e) {
+              final meta = _methodMeta[e.key] ?? ('Payment', Icons.payment_rounded, Colors.grey);
+              final fields = _fieldsForMethod(e.key, e.value);
+              if (fields.isEmpty) return const SizedBox.shrink();
+              return _MethodTile(label: meta.$1, icon: meta.$2, color: meta.$3, fields: fields, phone: phone);
+            }),
+            const SizedBox(height: 14),
+          ],
         ],
       ),
     );
   }
 
+  // ─── SUMMARY ────────────────────────────────────────────────
   Widget _buildSummaryBar() {
+    final pending = _invoices.where((i) => i['status'] == 'pending').fold<double>(0, (s, i) => s + ((i['amount'] as num?)?.toDouble() ?? 0));
+    final paid = _payments.fold<double>(0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0));
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
-          Expanded(child: _summaryChip('Pending', '\u00a3${_totalPending.toStringAsFixed(2)}', AppColors.warning, Icons.pending_rounded)),
+          Expanded(child: _chip('Pending', '\u00a3${pending.toStringAsFixed(2)}', AppColors.warning, Icons.pending_rounded)),
           const SizedBox(width: 12),
-          Expanded(child: _summaryChip('Paid', '\u00a3${_totalPaid.toStringAsFixed(2)}', AppColors.success, Icons.check_circle_rounded)),
+          Expanded(child: _chip('Paid', '\u00a3${paid.toStringAsFixed(2)}', AppColors.success, Icons.check_circle_rounded)),
         ],
       ),
     );
   }
 
-  Widget _summaryChip(String label, String amount, Color color, IconData icon) {
+  Widget _chip(String label, String amount, Color color, IconData icon) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withValues(alpha: 0.15))),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-              Text(amount, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
-            ],
-          ),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)), Text(amount, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color))]),
         ],
       ),
     );
   }
 
+  // ─── TABS ───────────────────────────────────────────────────
   Widget _buildRequestsTab() {
-    if (_requests.isEmpty) {
-      return _emptyState(Icons.request_page_rounded, 'No payment requests', 'Your instructor will send requests here');
-    }
+    if (_requests.isEmpty) return _empty(Icons.request_page_rounded, 'No payment requests', 'Your instructor will send requests here');
     final pending = _requests.where((r) => r['status'] == 'pending').toList();
     final history = _requests.where((r) => r['status'] != 'pending').toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (pending.isNotEmpty) ...[
-          _sectionHeader('Pending'),
-          ...pending.map((r) => _RequestCard(request: r)),
-          if (history.isNotEmpty) const SizedBox(height: 20),
-        ],
-        if (history.isNotEmpty) ...[
-          _sectionHeader('History'),
-          ...history.map((r) => _RequestCard(request: r)),
-        ],
-      ],
-    );
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      if (pending.isNotEmpty) ...[_header('Pending'), ...pending.map((r) => _RequestCard(request: r)), if (history.isNotEmpty) const SizedBox(height: 20)],
+      if (history.isNotEmpty) ...[_header('History'), ...history.map((r) => _RequestCard(request: r))],
+    ]);
   }
 
   Widget _buildInvoicesTab() {
-    if (_invoices.isEmpty) {
-      return _emptyState(Icons.receipt_long_rounded, 'No invoices', 'Your instructor hasn\'t sent any invoices yet');
-    }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: _invoices.map((inv) => _InvoiceCard(invoice: inv, onPay: inv['status'] == 'pending' ? () => _showPaymentSheet(inv) : null)).toList(),
-    );
+    if (_invoices.isEmpty) return _empty(Icons.receipt_long_rounded, 'No invoices', 'Your instructor hasn\'t sent any invoices yet');
+    return ListView(padding: const EdgeInsets.all(16), children: _invoices.map((inv) => _InvoiceCard(invoice: inv, onPay: inv['status'] == 'pending' ? () => _showPaySheet(inv) : null)).toList());
   }
 
   Widget _buildHistoryTab() {
-    if (_payments.isEmpty) {
-      return _emptyState(Icons.history_rounded, 'No payment history', 'Your payments will appear here');
-    }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: _payments.map((p) => _PaymentRecordCard(payment: p)).toList(),
-    );
+    if (_payments.isEmpty) return _empty(Icons.history_rounded, 'No payment history', 'Your payments will appear here');
+    return ListView(padding: const EdgeInsets.all(16), children: _payments.map((p) => _PaymentCard(payment: p)).toList());
   }
 
-  Widget _sectionHeader(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)),
-    );
-  }
+  Widget _header(String t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.grey.shade700)));
 
-  Widget _emptyState(IconData icon, String title, String subtitle) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 72, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.grey.shade500)),
-            const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade500), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
+  Widget _empty(IconData icon, String title, String subtitle) {
+    return Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, size: 72, color: Colors.grey.shade300), const SizedBox(height: 16), Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.grey.shade500)), const SizedBox(height: 8), Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade500), textAlign: TextAlign.center)])));
   }
 }
 
-// ─── Payment Method Tile ──────────────────────────────────────
-class _PayMethodTile extends StatelessWidget {
-  const _PayMethodTile({required this.methodKey, required this.methodData, required this.phone});
-  final String methodKey;
-  final Map<String, dynamic> methodData;
-  final String phone;
+// ─── DATA TYPES ───────────────────────────────────────────────
+class _DetailPair { final String label; final String value; _DetailPair(this.label, this.value); }
 
-  static const _labels = {
-    'bank_transfer': ('Bank Transfer', Icons.account_balance_rounded, Color(0xFF3B82F6)),
-    'paypal': ('PayPal', Icons.account_balance_wallet_rounded, Color(0xFF0070BA)),
-    'revolut': ('Revolut', Icons.credit_card_rounded, Color(0xFF0075EB)),
-    'monzo': ('Monzo', Icons.phone_android_rounded, Color(0xFFFFA500)),
-    'starling': ('Starling Bank', Icons.savings_rounded, Color(0xFF6938D9)),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final info = _labels[methodKey] ?? ('Payment', Icons.payment_rounded, Colors.grey);
-    final label = info.$1;
-    final icon = info.$2;
-    final color = info.$3;
-
-    final detailItems = <_DetailPair>[];
-    final accountName = methodData['account_name'] as String?;
-    final accountNumber = methodData['account_number'] as String?;
-    final sortCode = methodData['sort_code'] as String?;
-    final bankName = methodData['bank_name'] as String?;
-
-    if (accountName != null && accountName.isNotEmpty) detailItems.add(_DetailPair('Account Name', accountName));
-    if (bankName != null && bankName.isNotEmpty) detailItems.add(_DetailPair('Bank', bankName));
-    if (sortCode != null && sortCode.isNotEmpty) detailItems.add(_DetailPair('Sort Code', sortCode));
-    if (accountNumber != null && accountNumber.isNotEmpty) detailItems.add(_DetailPair('Account No', accountNumber));
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.12)),
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: const Border(),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        subtitle: Text(detailItems.isEmpty ? 'No details set' : 'Tap to view & copy ${detailItems.length} details', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        children: [
-          if (detailItems.isEmpty)
-            Text('No bank details configured. Contact your instructor.', style: TextStyle(fontSize: 13, color: Colors.grey.shade500))
-          else
-            ...detailItems.map((d) => _CopyableRow(label: d.label, value: d.value)),
-          if (phone.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            InkWell(
-              onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.phone_rounded, size: 16, color: AppColors.sunsetBright),
-                    const SizedBox(width: 8),
-                    Text('Call $phone', style: TextStyle(color: AppColors.sunsetBright, fontWeight: FontWeight.w700, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailPair {
+// ─── METHOD TILE ──────────────────────────────────────────────
+class _MethodTile extends StatelessWidget {
+  const _MethodTile({required this.label, required this.icon, required this.color, required this.fields, required this.phone});
   final String label;
-  final String value;
-  _DetailPair(this.label, this.value);
-}
-
-class _CopyableRow extends StatelessWidget {
-  const _CopyableRow({required this.label, required this.value});
-  final String label;
-  final String value;
+  final IconData icon;
+  final Color color;
+  final List<_DetailPair> fields;
+  final String? phone;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withValues(alpha: 0.1))),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        shape: const Border(),
+        leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 22)),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        subtitle: Text('${fields.length} ${fields.length == 1 ? 'detail' : 'details'} — tap to copy', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         children: [
-          SizedBox(width: 90, child: Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600))),
-          const SizedBox(width: 8),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied'), duration: const Duration(seconds: 1)));
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? AppColors.darkBorder : Colors.grey.shade300, width: 0.5),
+          ...fields.map((d) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 96, child: Text(d.label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600))),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: d.value));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${d.label} copied'), duration: const Duration(seconds: 1)));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? AppColors.darkBorder : Colors.grey.shade300, width: 0.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(d.value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.3))),
+                          const SizedBox(width: 8),
+                          Icon(Icons.copy_rounded, size: 14, color: Colors.grey.shade500),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          )),
+          if (phone != null && phone!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            InkWell(
+              onTap: () async { final u = Uri.parse('tel:$phone'); if (await canLaunchUrl(u)) await launchUrl(u); },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: AppColors.sunsetBright.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
                 child: Row(
-                  children: [
-                    Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.5))),
-                    const SizedBox(width: 8),
-                    Icon(Icons.copy_rounded, size: 14, color: Colors.grey.shade500),
-                  ],
+                  mainAxisSize: MainAxisSize.min,
+                  children: [Icon(Icons.phone_rounded, size: 16, color: AppColors.sunsetBright), const SizedBox(width: 8), Text('Call $phone', style: TextStyle(color: AppColors.sunsetBright, fontWeight: FontWeight.w700, fontSize: 13))],
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-// ─── Cards ────────────────────────────────────────────────────
+// ─── CARDS ────────────────────────────────────────────────────
 class _RequestCard extends StatelessWidget {
   const _RequestCard({required this.request});
   final Map<String, dynamic> request;
 
-  Color _statusColor(String? s) => switch (s) {
-    'pending' => AppColors.warning,
-    'paid' => AppColors.success,
-    'approved' => AppColors.info,
-    'rejected' => AppColors.error,
-    _ => Colors.grey,
-  };
+  Color _c(String? s) => switch (s) { 'pending' => AppColors.warning, 'paid' => AppColors.success, 'rejected' => AppColors.error, 'approved' => AppColors.info, _ => Colors.grey };
 
   @override
   Widget build(BuildContext context) {
     final status = request['status'] as String? ?? 'pending';
-    final color = _statusColor(status);
+    final color = _c(status);
     final date = DateTime.tryParse(request['created_at'] ?? '');
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
-        border: status == 'pending' ? Border.all(color: AppColors.warning.withValues(alpha: 0.3)) : null,
-      ),
+      decoration: BoxDecoration(color: isDark ? AppColors.darkCard : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))], border: status == 'pending' ? Border.all(color: AppColors.warning.withValues(alpha: 0.3)) : null),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(status == 'paid' ? Icons.check_circle_rounded : status == 'rejected' ? Icons.cancel_rounded : Icons.pending_rounded, color: color, size: 22),
-          ),
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(status == 'paid' ? Icons.check_circle_rounded : status == 'rejected' ? Icons.cancel_rounded : Icons.pending_rounded, color: color, size: 22)),
           const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('\u00a3${(request['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                if (request['description'] != null && request['description'].toString().isNotEmpty)
-                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(request['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                if (date != null)
-                  Padding(padding: const EdgeInsets.only(top: 4), child: Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-            child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('\u00a3${(request['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            if (request['description'] != null && request['description'].toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(request['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            if (date != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))),
+          ])),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)), child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color))),
         ],
       ),
     );
@@ -774,70 +605,26 @@ class _InvoiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = invoice['status'] as String? ?? 'pending';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dueDate = invoice['due_date'] != null ? DateTime.tryParse(invoice['due_date'].toString()) : null;
+    final due = invoice['due_date'] != null ? DateTime.tryParse(invoice['due_date'].toString()) : null;
+    final sc = switch (status) { 'paid' => AppColors.success, 'overdue' => AppColors.error, 'cancelled' => Colors.grey, _ => AppColors.warning };
 
-    final statusColor = switch (status) {
-      'paid' => AppColors.success,
-      'overdue' => AppColors.error,
-      'cancelled' => Colors.grey,
-      _ => AppColors.warning,
-    };
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
-      ),
-      child: InkWell(
-        onTap: onPay,
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('\u00a3${(invoice['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                  child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor)),
-                ),
-              ],
-            ),
-            if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(invoice['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (dueDate != null) ...[
-                  Icon(Icons.event_rounded, size: 14, color: Colors.grey.shade500),
-                  const SizedBox(width: 4),
-                  Text('Due: ${DateFormat('d MMM yyyy').format(dueDate)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                  const Spacer(),
-                ],
-                if (onPay != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(10)),
-                    child: const Text('Pay', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: isDark ? AppColors.darkCard : Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))]), child: InkWell(onTap: onPay, borderRadius: BorderRadius.circular(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text('\u00a3${(invoice['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), decoration: BoxDecoration(color: sc.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)), child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: sc))),
+      ]),
+      if (invoice['description'] != null && invoice['description'].toString().isNotEmpty) ...[const SizedBox(height: 6), Text(invoice['description'].toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600))],
+      const SizedBox(height: 12),
+      Row(children: [
+        if (due != null) ...[Icon(Icons.event_rounded, size: 14, color: Colors.grey.shade500), const SizedBox(width: 4), Text('Due: ${DateFormat('d MMM yyyy').format(due)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)), const Spacer()],
+        if (onPay != null) Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: AppColors.sunsetBright, borderRadius: BorderRadius.circular(10)), child: const Text('Pay', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13))),
+      ]),
+    ])));
   }
 }
 
-class _PaymentRecordCard extends StatelessWidget {
-  const _PaymentRecordCard({required this.payment});
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({required this.payment});
   final Map<String, dynamic> payment;
 
   @override
@@ -847,34 +634,11 @@ class _PaymentRecordCard extends StatelessWidget {
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
     final desc = payment['description'] as String? ?? 'Payment';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(desc, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (date != null) Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-              ],
-            ),
-          ),
-          Text('-\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.success)),
-        ],
-      ),
-    );
+    return Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: isDark ? AppColors.darkCard : Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder, width: 0.5)), child: Row(children: [
+      Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 22)),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(desc, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis), if (date != null) Text(DateFormat('d MMM yyyy').format(date), style: TextStyle(fontSize: 12, color: Colors.grey.shade500))])),
+      Text('-\u00a3${amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.success)),
+    ]));
   }
 }
