@@ -55,25 +55,43 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
       _instructorId = link?['instructor_id'] as String?;
     } catch (_) { _instructorId = null; }
 
-    // Step 2: Get instructor profile (independent)
+    // Step 2: Get instructor profile (includes payment_info JSONB)
     if (_instructorId != null) {
       try {
         _instructor = await Supabase.instance.client
             .from('profiles')
-            .select('full_name, business_name, phone, email')
+            .select('full_name, business_name, phone, email, payment_info')
             .eq('id', _instructorId!)
             .maybeSingle();
       } catch (_) { _instructor = null; }
 
-      // Step 3: Get instructor payment info (independent — don't let this break everything)
+      // Source 1: Always read profiles.payment_info JSONB (instructor sets this in Settings)
+      _payMethods = {};
+      if (_instructor != null) {
+        final pi = (_instructor!['payment_info'] as Map?)?.cast<String, dynamic>() ?? {};
+        if (pi['account_number'] != null && (pi['account_number'] as String).isNotEmpty) {
+          _payMethods['bank_transfer'] = {
+            'enabled': true,
+            'bank_name': pi['bank_name'] ?? '',
+            'sort_code': pi['sort_code'] ?? '',
+            'account_number': pi['account_number'] ?? '',
+            'account_name': _instructor!['full_name'] ?? '',
+          };
+        }
+      }
+
+      // Source 2: Also try instructor_payment_info table (multiple methods) — may not exist
       try {
         final payInfo = await Supabase.instance.client
             .from('instructor_payment_info')
             .select('methods')
             .eq('instructor_id', _instructorId!)
             .maybeSingle();
-        _payMethods = (payInfo?['methods'] as Map?)?.cast<String, dynamic>() ?? {};
-      } catch (_) { _payMethods = {}; }
+        if (payInfo?['methods'] != null) {
+          final tm = (payInfo!['methods'] as Map).cast<String, dynamic>();
+          _payMethods.addAll(tm);
+        }
+      } catch (_) { /* table might not exist — profile data already loaded */ }
     }
 
     // Step 4: Load each data type independently
@@ -340,6 +358,8 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
               ),
             ],
           ),
+          // Bank details section — shown directly on main screen
+          ..._buildBankDetailsSection(phone),
           if (phone != null && phone.isNotEmpty) ...[
             const SizedBox(height: 12),
             InkWell(
@@ -358,6 +378,93 @@ class _PupilPaymentScreenState extends State<PupilPaymentScreen>
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildBankDetailsSection(String? phone) {
+    // Get bank transfer method data
+    final bt = _payMethods['bank_transfer'] as Map<String, dynamic>?;
+    if (bt == null || bt['enabled'] != true) return [];
+
+    final bankName = bt['bank_name'] as String? ?? '';
+    final sortCode = bt['sort_code'] as String? ?? '';
+    final accountNum = bt['account_number'] as String? ?? '';
+    final accountName = bt['account_name'] as String? ?? _instructor?['full_name'] as String? ?? '';
+
+    if (accountNum.isEmpty) return [];
+
+    return [
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.account_balance_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                const Text('Bank Details', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white)),
+                const Spacer(),
+                const Text('Tap to copy', style: TextStyle(fontSize: 10, color: Colors.white70)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (accountName.isNotEmpty)
+              _bankDetailRow('Account Name', accountName),
+            if (bankName.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _bankDetailRow('Bank', bankName),
+            ],
+            if (sortCode.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _bankDetailRow('Sort Code', sortCode),
+            ],
+            if (accountNum.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _bankDetailRow('Account No', accountNum),
+            ],
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _bankDetailRow(String label, String value) {
+    return InkWell(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: value));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label copied'), duration: const Duration(seconds: 1)),
+        );
+      },
+      child: Row(
+        children: [
+          SizedBox(width: 88, child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w600))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white, letterSpacing: 0.5))),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.copy_rounded, size: 12, color: Colors.white70),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
