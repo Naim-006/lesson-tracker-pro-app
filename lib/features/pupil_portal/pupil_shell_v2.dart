@@ -17,7 +17,8 @@ class PupilShell extends ConsumerStatefulWidget {
 
 class _PupilShellState extends ConsumerState<PupilShell> with TickerProviderStateMixin {
   int _currentIndex = 0;
-  late List<AnimationController> _dotControllers;
+  late PageController _pageController;
+  late AnimationController _navAnimController;
 
   static const _tabs = [
     (icon: Icons.home_outlined, active: Icons.home_rounded, label: 'Home', color: AppColors.sunsetBright),
@@ -30,23 +31,22 @@ class _PupilShellState extends ConsumerState<PupilShell> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    _dotControllers = List.generate(5, (_) => AnimationController(vsync: this, duration: const Duration(milliseconds: 400)));
-    _dotControllers[0].value = 1.0;
+    _pageController = PageController();
+    _navAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _navAnimController.forward();
   }
 
   @override
   void dispose() {
-    for (final c in _dotControllers) { c.dispose(); }
+    _pageController.dispose();
+    _navAnimController.dispose();
     super.dispose();
   }
 
   void _onTap(int i) {
     if (i == _currentIndex) return;
-    setState(() {
-      _dotControllers[_currentIndex].reverse();
-      _currentIndex = i;
-      _dotControllers[i].forward();
-    });
+    _pageController.animateToPage(i, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+    setState(() => _currentIndex = i);
   }
 
   @override
@@ -62,130 +62,104 @@ class _PupilShellState extends ConsumerState<PupilShell> with TickerProviderStat
     ];
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF6F4F0),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: pages[_currentIndex],
-        ),
+      backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF7F5F2),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: pages,
       ),
-      bottomNavigationBar: _GlassBottomNav(
-        selectedIndex: _currentIndex,
+      extendBody: true,
+      bottomNavigationBar: _FloatingNav(
+        currentIndex: _currentIndex,
         tabs: _tabs,
         isDark: isDark,
         onTap: _onTap,
-        dotControllers: _dotControllers,
       ),
     );
   }
 }
 
-class _GlassBottomNav extends StatelessWidget {
-  const _GlassBottomNav({
-    required this.selectedIndex,
-    required this.tabs,
-    required this.isDark,
-    required this.onTap,
-    required this.dotControllers,
-  });
-
-  final int selectedIndex;
+class _FloatingNav extends StatelessWidget {
+  const _FloatingNav({required this.currentIndex, required this.tabs, required this.isDark, required this.onTap});
+  final int currentIndex;
   final List<({IconData icon, IconData active, String label, Color color})> tabs;
   final bool isDark;
   final ValueChanged<int> onTap;
-  final List<AnimationController> dotControllers;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-        child: Container(
-          height: 72,
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF0F172A).withValues(alpha: 0.85)
-                : Colors.white.withValues(alpha: 0.82),
-            border: Border(
-              top: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.06),
-                width: 0.5,
-              ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1E293B).withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: SafeArea(
+              top: false,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(tabs.length, (i) {
                   final t = tabs[i];
-                  final sel = selectedIndex == i;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onTap(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? t.color.withValues(alpha: isDark ? 0.2 : 0.1)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(
-                                  sel ? t.active : t.icon,
-                                  size: sel ? 24 : 22,
-                                  color: sel
-                                      ? t.color
-                                      : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
-                                ),
-                                if (sel)
-                                  Positioned(
-                                    bottom: -4,
-                                    child: FadeTransition(
-                                      opacity: dotControllers[i],
-                                      child: Container(
-                                        width: 4,
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          color: t.color,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                  final sel = currentIndex == i;
+                  return GestureDetector(
+                    onTap: () => onTap(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? t.color.withValues(alpha: 0.12) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                            width: sel ? 22 : 24,
+                            height: sel ? 22 : 24,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              sel ? t.active : t.icon,
+                              size: sel ? 22 : 20,
+                              color: sel ? t.color : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              t.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                                color: sel
-                                    ? t.color
-                                    : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+                          ),
+                          const SizedBox(width: 6),
+                          if (sel || !sel)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOutCubic,
+                              width: sel ? 50 : 0,
+                              child: AnimatedOpacity(
+                                opacity: sel ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Text(
+                                  t.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.color),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                   );
